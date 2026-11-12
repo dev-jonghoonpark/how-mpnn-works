@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MPNN — 원자들이 이웃에게 말을 건네는 신경망</title>
+<meta name="description" content="Neural Message Passing for Quantum Chemistry(Gilmer 외, ICML 2017)를 브라우저에서 직접 실험하며 배우는 인터랙티브 교육 자료. 분자를 그래프로 적기, 메시지·갱신·판독 세 함수, 순열 불변, 여덟 그래프 모델의 통일, 엣지 네트워크와 거리 표현, 가상 엣지·마스터 노드, set2set, 타워, QM9 결과, 브라우저에서 학습하는 작은 MPNN까지.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb;
+  --page:#f9f9f7;
+  --text-primary:#0b0b0b;
+  --text-secondary:#52514e;
+  --muted:#898781;
+  --grid:#e1e0d9;
+  --axis:#c3c2b7;
+  --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6;
+  --s2:#eb6834;
+  --s3:#1baf7a;
+  --s4:#8b5cf6;
+  --s8:#e34948;
+  --warn:#fab219;
+  --good:#0ca30c;
+  --wash:rgba(42,120,214,0.08);
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19;
+  --page:#0d0d0d;
+  --text-primary:#ffffff;
+  --text-secondary:#c3c2b7;
+  --muted:#898781;
+  --grid:#2c2c2a;
+  --axis:#383835;
+  --border:rgba(255,255,255,0.10);
+  --s1:#3987e5;
+  --s2:#d95926;
+  --s3:#199e70;
+  --s4:#a78bfa;
+  --s8:#e66767;
+  --warn:#fab219;
+  --good:#0ca30c;
+  --wash:rgba(57,135,229,0.14);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+body{
+  margin:0; background:var(--page); color:var(--text-primary);
+  font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:16px; line-height:1.75; letter-spacing:-0.01em;
+}
+.wrap{max-width:880px;margin:0 auto;padding:0 16px 120px}
+header.hero{padding:56px 0 28px;border-bottom:1px solid var(--border);margin-bottom:8px}
+h1{font-size:clamp(28px,5.2vw,42px);line-height:1.25;margin:0 0 12px;letter-spacing:-0.03em}
+.sub{color:var(--text-secondary);font-size:17px;margin:0}
+.kicker{font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 10px}
+h2{font-size:clamp(21px,3.4vw,27px);margin:56px 0 6px;letter-spacing:-0.02em;line-height:1.3}
+h3{font-size:18px;margin:34px 0 6px;letter-spacing:-0.015em}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:22px}
+li{margin:6px 0}
+strong{font-weight:650}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.9em;background:var(--wash);padding:1px 5px;border-radius:4px}
+a{color:var(--s1)}
+.demo{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px;margin:24px 0}
+.demo h4{margin:0 0 2px;font-size:15px;color:var(--text-primary);font-weight:650}
+.demo .cap{color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.6}
+canvas{display:block;width:100%;border-radius:8px;background:var(--surface-1);touch-action:manipulation}
+.ctrls{display:flex;flex-wrap:wrap;gap:14px 22px;margin:14px 0 4px;align-items:flex-end}
+.ctrl{flex:1 1 210px;min-width:170px}
+.ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text-secondary);margin-bottom:4px;gap:10px}
+.ctrl label b{font-variant-numeric:tabular-nums;color:var(--text-primary);font-weight:650;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--s1);height:22px;margin:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+button{font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);transition:background .12s}
+button:hover{background:var(--wash)}
+button[aria-pressed=true]{background:var(--wash);border-color:var(--s1)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--text-secondary);margin:10px 0 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.readout{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:12px;font-size:13px;color:var(--text-secondary)}
+.readout b{display:block;font-size:19px;color:var(--text-primary);font-weight:650;line-height:1.3;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.eq{background:var(--surface-1);border:1px solid var(--border);border-left:3px solid var(--s1);
+  border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0;overflow-x:auto;text-align:center}
+.eq .note{display:block;font-size:12.5px;color:var(--muted);margin:6px 0 0;line-height:1.55;text-align:left}
+.tw{overflow-x:auto;margin:18px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface-1)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle}
+th{font-weight:650;font-size:12.5px;color:var(--text-secondary);background:var(--page)}
+tr:last-child td{border-bottom:none}
+td.num,th.num{font-variant-numeric:tabular-nums;text-align:right}
+td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.note{border-left:3px solid var(--axis);padding:2px 0 2px 16px;margin:18px 0;color:var(--text-secondary);font-size:14.5px}
+.key{border:1px solid var(--border);border-left:3px solid var(--s2);background:var(--surface-1);
+  border-radius:0 10px 10px 0;padding:14px 18px;margin:20px 0}
+.key .lbl{font-size:11.5px;font-weight:700;letter-spacing:0.1em;color:var(--s2);display:block;margin-bottom:4px}
+.key p{margin:0}
+nav.toc{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin:26px 0}
+nav.toc ol{margin:6px 0 0;padding-left:20px;font-size:14.5px}
+nav.toc a{text-decoration:none;color:var(--text-primary)}
+nav.toc a:hover{color:var(--s1)}
+.q{border:1px solid var(--border);border-radius:10px;background:var(--surface-1);padding:16px 18px;margin:14px 0}
+.q h4{margin:0 0 8px;font-size:15px;color:var(--text-primary)}
+.q .opt{display:flex;gap:9px;align-items:flex-start;padding:7px 10px;border:1px solid var(--border);
+  border-radius:8px;margin:6px 0;cursor:pointer;font-size:14px;transition:border-color .12s}
+.q .opt:hover{border-color:var(--s1)}
+.q .opt input{margin-top:5px;accent-color:var(--s1)}
+.q .opt.correct{border-color:var(--good);background:rgba(12,163,12,0.08)}
+.q .opt.wrong{border-color:var(--s8);background:rgba(227,73,72,0.07)}
+.q .expl{display:none;font-size:13.5px;color:var(--text-secondary);border-left:3px solid var(--good);
+  padding:2px 0 2px 12px;margin-top:10px;line-height:1.65}
+.q .expl.bad{border-left-color:var(--s8)}
+.q .expl.show{display:block}
+.quiz-score{font-size:15px;font-weight:700;margin-top:14px}
+.tog{position:fixed;top:14px;right:14px;z-index:10;border-radius:999px;padding:7px 13px;
+  background:var(--surface-1);border:1px solid var(--border);font-size:12.5px}
+footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+footer a{color:var(--text-secondary)}
+.refs{font-size:13px;color:var(--text-secondary);line-height:1.7}
+.easy{background:var(--surface-1);border:1px solid var(--border);border-left:3px solid var(--s3);border-radius:0 14px 14px 0;padding:18px 20px;margin:24px 0}
+.easy .lbl{font-size:11.5px;font-weight:700;letter-spacing:0.1em;color:var(--s3);display:block;margin-bottom:2px}
+.easy h3{margin:0 0 8px}
+.easy ol{padding-left:20px}
+.easy .big{font-size:17px;text-align:center;margin:10px 0;font-weight:650}
+.sw{display:grid;grid-template-columns:150px 1fr 64px;gap:8px 10px;align-items:center;font-size:13px;margin-top:12px}
+.sw .bar{position:relative;height:18px;background:var(--page);border:1px solid var(--border);border-radius:4px}
+.sw .bar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.sw .bar:after{content:'';position:absolute;left:50%;top:-3px;bottom:-3px;border-left:1px solid var(--axis)}
+.sw b{font-variant-numeric:tabular-nums;text-align:right}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:640px){.split{grid-template-columns:1fr}}
+.split h5{margin:4px 0 0;font-size:13px;color:var(--text-secondary);font-weight:650}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;margin:16px 0;justify-content:center}
+.flow span{border:1px solid var(--border);background:var(--surface-1);border-radius:8px;padding:5px 10px;font-weight:600}
+.flow em{color:var(--muted);font-style:normal}
+sup.fn{font-size:0.72em;line-height:0;margin-left:1px}
+sup.fn a{text-decoration:none;font-weight:700;padding:0 2px}
+.footnotes{margin-top:64px;padding-top:18px;border-top:1px solid var(--border);font-size:14.5px;color:var(--text-secondary)}
+.footnotes h2{font-size:18px;margin:0 0 10px;color:var(--text-primary)}
+.footnotes ol{padding-left:22px}
+.footnotes li:target{background:var(--wash);border-radius:8px}
+.footnotes p{margin:10px 0}
+.footnotes .tw{font-size:13.5px}
+.footnotes .back{text-decoration:none;margin-left:4px}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--wash);color:var(--s1);margin-left:6px;vertical-align:2px}
+/* 이 페이지 전용 */
+:root{--s5:#c2410c;--s6:#0e7490;--s7:#a16207;--el-C:#52514e;--el-N:#2a78d6;--el-O:#e34948;--el-M:#8b5cf6}
+:root[data-theme="dark"]{--s5:#fb923c;--s6:#22d3ee;--s7:#facc15;--el-C:#c3c2b7;--el-N:#3987e5;--el-O:#e66767;--el-M:#a78bfa}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chips button{display:inline-flex;align-items:center;gap:6px;padding:5px 11px}
+.chips button i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.chips button[aria-pressed=false]{opacity:.55}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media (max-width:640px){.split{grid-template-columns:1fr}}
+.split h5{margin:4px 0 0;font-size:13px;color:var(--text-secondary);font-weight:650}
+.vec{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;white-space:nowrap}
+.vecs{font-size:13px;color:var(--text-secondary);margin-top:12px;line-height:1.8;overflow-x:auto}
+.vecs .row{display:flex;gap:10px;align-items:baseline;flex-wrap:nowrap}
+.vecs .row span:first-child{min-width:150px}
+.fx{font-size:14px;margin-top:12px;overflow-x:auto}
+.fx .lbl{display:inline-block;min-width:22px;font-weight:700;color:var(--s1)}
+.fx div{margin:6px 0}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+select{font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary)}
+td.ok{color:var(--good);font-weight:650}
+td.bad{color:var(--s8)}
+@media (max-width:640px){.tog{position:absolute}}
+</style>
+</head>
+<body>
+<button class="tog" id="themeBtn" type="button">◐ 다크</button>
+<div class="wrap">
+<header class="hero">
+  <p class="kicker">그래프 신경망 · Gilmer, Schoenholz, Riley, Vinyals &amp; Dahl (ICML 2017)</p>
+  <h1>MPNN — 원자들이 이웃에게 말을 건네는 신경망</h1>
+  <p class="sub">분자는 이미지도 문장도 아닙니다. 원자는 노드, 결합은 엣지인 <strong>그래프</strong>이고, 원자에 번호를 어떻게 매기든 같은 분자입니다. 「Neural Message Passing for Quantum Chemistry」는 그때까지 따로따로 나온 그래프 신경망 여덟 개가 사실 <strong>함수 세 개(메시지 M, 갱신 U, 판독 R)를 무엇으로 고르느냐</strong>만 다르다는 것을 보이고, 이 틀을 메시지 전달 신경망(MPNN)이라 불렀습니다. 그 안에서 더 나은 조합을 찾아 QM9의 13개 성질 모두에서 최고 성능을 냈고, 그중 11개에서 화학자들이 요구하는 정확도(chemical accuracy)에 도달했습니다. 이 페이지는 식 세 줄을 분자 위에서 한 단계씩 돌려 보고, 마지막에는 작은 MPNN을 브라우저에서 학습시킵니다.</p>
+</header>
+
+<nav class="toc">
+  <strong>학습 경로</strong>
+  <ol>
+    <li><a href="#s1">병목은 정확도가 아니라 비용</a></li>
+    <li><a href="#s2">분자를 그래프로 적기</a></li>
+    <li><a href="#s3">식 (1)~(3): 메시지, 갱신, 판독</a></li>
+    <li><a href="#s4">번호를 바꿔도 같은 답: 순열 불변</a></li>
+    <li><a href="#s5">여덟 개의 모델, 하나의 틀</a></li>
+    <li><a href="#s6">메시지 함수와 엣지 표현: 거리를 어떻게 넣을까</a></li>
+    <li><a href="#s7">멀리 있는 원자: 가상 엣지와 마스터 노드</a></li>
+    <li><a href="#s8">판독: 합으로 충분한가, set2set</a></li>
+    <li><a href="#s9">타워: 넓은 상태를 쪼개 돌리기</a></li>
+    <li><a href="#s10">QM9 결과</a></li>
+    <li><a href="#s11">브라우저에서 학습하는 MPNN: T는 몇이면 되나</a></li>
+    <li><a href="#s12">MPNN 이후</a></li>
+    <li><a href="#s13">확인 퀴즈</a></li>
+  </ol>
+</nav>
+
+<!-- ───────── 1 ───────── -->
+<h2 id="s1">1. 병목은 정확도가 아니라 비용</h2>
+<p>신약이나 새 소재 후보를 찾을 때 분자의 에너지, 쌍극자 모멘트, HOMO–LUMO 간격 같은 성질을 알아야 합니다. 실험으로 다 재기는 불가능하니 계산으로 걸러 내는데, 표준 도구는 <strong>밀도범함수이론(DFT)</strong>입니다. DFT는 속도와 정확도의 균형이 좋지만 여전히 느립니다. 논문에 따르면 무거운 원자 9개짜리 QM9 분자 하나를 Gaussian G09로 계산하는 데 Xeon E5-2660(2.2 GHz) 코어 하나로 <strong>약 1시간</strong>, 무거운 원자 17개짜리는 <strong>최대 8시간</strong>이 걸립니다. 전자 수 \(N_e\)에 대해 \(O(N_e^3)\)으로 늘어나기 때문입니다.</p>
+<p>그래서 논문의 질문은 “DFT를 흉내 내는 신경망을 만들 수 있는가”입니다. 학습이 끝난 신경망의 추론은 논문 표현으로 DFT보다 <strong>30만 배 빠릅니다</strong>. 아래에서 후보 분자 수와 코어 수를 바꿔 보세요.</p>
+
+<div class="demo">
+  <h4>데모 1 · 스크리닝 시간 계산기</h4>
+  <p class="cap">DFT는 분자당 코어 1시간(논문의 QM9 기준), 신경망은 그보다 30만 배 빠르다고 둔 계산입니다. 신경망 쪽은 학습 비용을 빼고 추론만 셉니다.</p>
+  <div class="ctrls">
+    <div class="ctrl"><label>후보 분자 수 <b id="d1nv"></b></label><input type="range" id="d1n" min="3" max="9" step="0.5" value="6"></div>
+    <div class="ctrl"><label>CPU 코어 수 <b id="d1cv"></b></label><input type="range" id="d1c" min="0" max="4" step="1" value="2"></div>
+  </div>
+  <div class="readout" id="d1out"></div>
+  <canvas id="d1cv2" height="120"></canvas>
+</div>
+
+<div class="key"><span class="lbl">핵심</span><p>정확도를 DFT보다 높이자는 게 아닙니다. DFT가 낸 답(QM9의 정답 라벨 자체가 DFT 계산값입니다)을 <strong>화학적으로 쓸 만한 오차 안에서, 훨씬 빠르게</strong> 재현하자는 것입니다. 그러면 “어떤 분자를 계산해 볼까”를 고르는 단계 자체가 사라집니다.</p></div>
+
+<!-- ───────── 2 ───────── -->
+<h2 id="s2">2. 분자를 그래프로 적기</h2>
+<p>이전 연구들은 분자를 고정 길이 벡터로 바꾼 뒤(분자 지문, Coulomb 행렬, Bag of Bonds 등) 일반 회귀 모델에 넣었습니다. 화학판 SIFT·HOG 같은 수작업 특징입니다. MPNN은 분자를 <strong>그래프 그대로</strong> 받습니다. 노드는 원자, 엣지는 원자 쌍입니다. 논문의 기본 설정은 무거운 원자만 노드로 두고 수소는 원자마다 개수 특징으로 붙이는 방식(암시적 수소)입니다.</p>
+<p>노드 특징은 논문 표 1 그대로입니다.</p>
+<div class="tw"><table>
+<tr><th>특징</th><th>설명</th><th>인코딩</th></tr>
+<tr><td>원자 종류</td><td>H, C, N, O, F</td><td>원-핫 5칸</td></tr>
+<tr><td>원자 번호</td><td>양성자 수</td><td>정수</td></tr>
+<tr><td>받개(acceptor)</td><td>전자를 받는가</td><td>0/1</td></tr>
+<tr><td>주개(donor)</td><td>전자를 주는가</td><td>0/1</td></tr>
+<tr><td>방향족</td><td>방향족 고리에 속하는가</td><td>0/1</td></tr>
+<tr><td>혼성</td><td>sp, sp², sp³</td><td>원-핫 3칸(없으면 0)</td></tr>
+<tr><td>수소 수</td><td>붙어 있는 수소 개수</td><td>정수</td></tr>
+</table></div>
+<p>엣지 특징은 세 가지를 비교했습니다. ① <strong>화학 그래프</strong>: 결합이 있는 쌍만 엣지이고 라벨은 결합 종류(단일·이중·삼중·방향족). 거리 정보가 없습니다. ② <strong>거리 구간</strong>: 모든 쌍을 엣지로 두고, 결합한 쌍은 결합 종류를, 결합하지 않은 쌍은 거리 구간 10개 중 하나를 라벨로 씁니다. [2, 6] Å를 8등분하고 [0, 2), [6, ∞)를 더해 10개, 결합 종류 4개와 합쳐 <strong>알파벳 14개</strong>입니다. ③ <strong>실수 거리</strong>: 모든 쌍에 5차원 벡터 [거리, 결합 종류 원-핫 4칸]을 붙입니다.</p>
+
+<div class="demo">
+  <h4>데모 2 · 분자를 입력 텐서로</h4>
+  <p class="cap">원자를 누르면 그 원자의 표 1 특징 벡터와, 다른 원자들과의 엣지 표현 세 가지가 나옵니다. 좌표는 그림용 2차원 근사라 거리는 실제 3차원 구조와 조금 다릅니다.</p>
+  <div class="chips" id="d2mol"></div>
+  <canvas id="d2c" height="260"></canvas>
+  <div class="vecs" id="d2feat"></div>
+  <div class="tw"><table id="d2tab"></table></div>
+</div>
+
+<!-- ───────── 3 ───────── -->
+<h2 id="s3">3. 식 (1)~(3): 메시지, 갱신, 판독</h2>
+<p>각 원자 \(v\)는 은닉 상태 \(h_v^t\)를 하나씩 들고 있습니다. 처음 상태 \(h_v^0\)은 원자 특징 \(x_v\)를 \(d\)차원으로 채운 것입니다. 그다음 <strong>메시지 전달 단계</strong>를 \(T\)번 반복합니다.</p>
+<div class="eq">
+\[ m_v^{t+1} = \sum_{w \in N(v)} M_t\left(h_v^t,\, h_w^t,\, e_{vw}\right) \qquad (1)\]
+\[ h_v^{t+1} = U_t\left(h_v^t,\, m_v^{t+1}\right) \qquad (2)\]
+<span class="note">이웃 \(w\)마다 메시지 함수 \(M_t\)로 메시지를 만들어 <strong>더하고</strong>, 갱신 함수 \(U_t\)로 자기 상태를 고칩니다. 모든 원자가 동시에 이 일을 합니다.</span>
+</div>
+<p>\(T\)번이 끝나면 <strong>판독 단계</strong>에서 모든 원자의 최종 상태를 모아 분자 하나의 성질을 예측합니다.</p>
+<div class="eq">
+\[ \hat{y} = R\left(\{\, h_v^T \mid v \in G \,\}\right) \qquad (3)\]
+<span class="note">\(R\)에 들어가는 것은 순서 있는 목록이 아니라 <strong>집합</strong>입니다. 그래서 \(R\)은 원소 순서에 무관해야 합니다(4절).</span>
+</div>
+<p>한 단계가 지나면 원자는 바로 옆 원자의 정보를 갖게 되고, 두 단계가 지나면 옆의 옆 원자의 정보까지 갖게 됩니다. \(T\)단계 뒤 \(h_v^T\)에는 <strong>그래프 거리 \(T\) 이내</strong> 원자들의 정보가 섞여 있습니다. 아래 데모는 작은 장난감 MPNN(\(d = 4\), 무작위 고정 가중치)을 실제로 돌립니다. 메시지는 결합 종류마다 다른 행렬을 곱하는 \(M = A_{e_{vw}} h_w\)(GG-NN 방식)이고, 갱신은 논문의 GRU 대신 \(U = \tanh(W h_v + m_v + b)\)로 단순화했습니다.</p>
+
+<div class="demo">
+  <h4>데모 3 · 메시지 전달 한 단계씩</h4>
+  <p class="cap">원자를 눌러 고르고 t를 올려 보세요. 진하게 칠해진 원자는 그 시점에 고른 원자의 상태에 정보가 들어온 원자입니다. 원자 아래 작은 막대 4개가 은닉 상태 h(파랑 +, 주황 −)입니다. 아래 계산은 고른 원자가 t−1에서 t로 갈 때 받은 메시지입니다.</p>
+  <div class="chips" id="d3mol"></div>
+  <div class="ctrls"><div class="ctrl"><label>단계 t <b id="d3tv"></b></label><input type="range" id="d3t" min="0" max="8" step="1" value="1"></div></div>
+  <canvas id="d3c" height="280"></canvas>
+  <div class="vecs" id="d3calc"></div>
+</div>
+
+<div class="note">에탄올(C–C–O)로 감을 잡아 보면, t = 1에서 산소는 옆 탄소만 압니다. t = 2에서 끝의 탄소는 가운데 탄소를 거쳐 산소의 정보를 <strong>간접적으로</strong> 받습니다. 양자역학을 푸는 게 아니라, 이웃 환경의 요약을 학습해 DFT의 답을 빠르게 근사하는 것입니다.</div>
+
+<!-- ───────── 4 ───────── -->
+<h2 id="s4">4. 번호를 바꿔도 같은 답: 순열 불변</h2>
+<p>원자 1, 2, 3에 번호를 어떻게 매기든 분자는 같으니 예측도 같아야 합니다. 식 (1)은 이웃 메시지를 <strong>더하므로</strong> 이웃 순서와 무관하고, 모든 원자가 같은 \(M\), \(U\)를 쓰므로 번호를 바꾸면 상태도 그대로 따라 바뀝니다. 남은 것은 판독인데, 논문은 \(R\)이 노드 상태의 순열에 불변이어야 MPNN 전체가 그래프 동형에 불변이 된다고 말합니다. 아래에서 번호를 섞어 보세요.</p>
+
+<div class="demo">
+  <h4>데모 4 · 번호 섞기</h4>
+  <p class="cap">데모 3의 장난감 MPNN을 T = 3까지 돌린 최종 상태를 두 방식으로 판독합니다. 합 판독은 \( \sum_v w^\top h_v^T \), 이어 붙이기 판독은 번호 순서대로 상태를 이어 붙인 벡터에 고정 가중치를 곱한 값입니다.</p>
+  <div class="chips" id="d4mol"></div>
+  <div class="btns"><button id="d4shuf">번호 섞기</button><button id="d4reset">원래대로</button></div>
+  <canvas id="d4c" height="230"></canvas>
+  <div class="readout" id="d4out"></div>
+</div>
+
+<!-- ───────── 5 ───────── -->
+<h2 id="s5">5. 여덟 개의 모델, 하나의 틀</h2>
+<p>논문 2절의 중심 주장입니다. 2015~2017년에 따로 나온 그래프 모델 여덟 개(Duvenaud 외의 분자 지문 합성곱, GG-NN, 상호작용 네트워크, Kearnes 외의 분자 그래프 합성곱, DTNN, 그리고 라플라시안 기반의 Bruna 외·Defferrard 외·Kipf &amp; Welling)가 모두 식 (1)~(3)에 \(M\), \(U\), \(R\)만 다르게 넣은 것입니다. 새 모델을 하나 더 낸 것이 아니라 <strong>설계 공간을 정의</strong>한 것이고, 덕분에 “어느 칸을 바꾸면 좋아지는가”를 체계적으로 실험할 수 있게 됐습니다.</p>
+
+<div class="demo">
+  <h4>데모 5 · 모델을 고르면 세 함수가 보입니다</h4>
+  <p class="cap">식은 논문 2절의 표기를 따릅니다. 괄호 \((a, b)\)는 이어 붙이기입니다.</p>
+  <div class="chips" id="d5btn"></div>
+  <div class="fx" id="d5fx"></div>
+  <p class="note" id="d5note" style="margin-top:14px"></p>
+</div>
+
+<!-- ───────── 6 ───────── -->
+<h2 id="s6">6. 메시지 함수와 엣지 표현: 거리를 어떻게 넣을까</h2>
+<p>논문 5.1절은 메시지 함수 세 가지를 비교합니다.</p>
+<ul>
+<li><strong>행렬 곱</strong> \(M(h_v, h_w, e_{vw}) = A_{e_{vw}} h_w\): GG-NN 방식. 엣지 라벨이 이산값일 때만 쓸 수 있습니다(라벨마다 행렬 하나).</li>
+<li><strong>엣지 네트워크</strong> \(M(h_v, h_w, e_{vw}) = A(e_{vw})\, h_w\): 엣지 벡터를 \(d \times d\) 행렬로 바꾸는 신경망 \(A\)를 둡니다. 거리처럼 <strong>연속값인 엣지</strong>를 그대로 받을 수 있습니다. 논문의 최고 모델이 이것입니다.</li>
+<li><strong>쌍 메시지</strong> \(m_{wv} = f(h_w^t, h_v^t, e_{vw})\): 받는 쪽 상태까지 넣는 신경망. 표현력은 가장 크지만 학습이 어려웠고, 엣지 네트워크가 13개 중 11개 성질에서 더 나았습니다(부록 표 9, 평균 오차 비율 3.98 vs 1.53).</li>
+</ul>
+
+<div class="demo">
+  <h4>데모 6 · 거리 구간 vs 엣지 네트워크</h4>
+  <p class="cap">결합하지 않은 두 원자 사이 거리를 움직여 보세요. 왼쪽은 거리 구간 라벨로 고르는 행렬 \(A_{\text{bin}}\), 오른쪽은 실수 거리를 넣은 작은 신경망이 만드는 행렬 \(A(e)\)입니다(4 × 4, 무작위 고정 가중치). 아래 곡선은 행렬 한 칸 값이 거리에 따라 어떻게 변하는지입니다.</p>
+  <div class="ctrls"><div class="ctrl"><label>원자 간 거리 <b id="d6dv"></b></label><input type="range" id="d6d" min="0.8" max="8" step="0.02" value="3.1"></div></div>
+  <div class="split">
+    <div><h5 id="d6l">거리 구간</h5><canvas id="d6a" height="170"></canvas></div>
+    <div><h5>엣지 네트워크 A(e)</h5><canvas id="d6b" height="170"></canvas></div>
+  </div>
+  <canvas id="d6c" height="150"></canvas>
+  <div class="legend"><span><i style="background:var(--s2)"></i>거리 구간: 구간 안에서는 평평하고 경계에서 뛴다</span><span><i style="background:var(--s1)"></i>엣지 네트워크: 거리에 따라 부드럽게 변한다</span></div>
+</div>
+
+<p>거리 정보가 얼마나 중요한지는 부록 표 10이 보여 줍니다. 모두 set2set 판독과 GRU 갱신을 쓴 모델의 13개 성질 평균 오차 비율(낮을수록 좋고 1 미만이면 화학적 정확도)입니다.</p>
+<div class="tw"><table>
+<tr><th>입력</th><th>메시지 함수</th><th class="num">평균 오차 비율</th></tr>
+<tr><td>거리 없음(화학 그래프)</td><td>행렬 곱</td><td class="num">2.57</td></tr>
+<tr><td>거리 있음</td><td>엣지 네트워크</td><td class="num">0.98</td></tr>
+<tr><td>거리 + 수소를 노드로(명시적 수소)</td><td>엣지 네트워크</td><td class="num"><strong>0.68</strong></td></tr>
+</table></div>
+<p>거리를 빼면 특히 공간적 크기를 재는 전자 공간 범위 \(R^2\)가 0.15에서 13.67로 무너집니다. 명시적 수소는 그래프가 최대 29개 노드로 커져 학습이 약 10배 느려지지만, 최고 성능은 이 설정에서 나왔습니다.</p>
+
+<!-- ───────── 7 ───────── -->
+<h2 id="s7">7. 멀리 있는 원자: 가상 엣지와 마스터 노드</h2>
+<p>\(T\)단계 뒤 원자는 그래프 거리 \(T\) 안쪽만 봅니다. 화학 그래프만 쓰면 사슬 양 끝처럼 먼 원자끼리는 정보가 늦게 닿습니다. 논문 5.2절의 처방은 두 가지입니다.</p>
+<ul>
+<li><strong>가상 엣지</strong>: 결합하지 않은 모든 쌍에 별도의 “가상” 엣지 종류를 추가합니다. 전처리 한 번이면 되고, 그래프가 완전 그래프가 되어 한 단계에 모두가 모두를 듣습니다. 거리 구간·실수 거리 표현은 사실상 이미 이렇게 되어 있습니다.</li>
+<li><strong>잠재 마스터 노드</strong>: 모든 원자와 특별한 엣지로 연결된 노드 하나를 추가합니다. 자기 차원 \(d_{\text{master}}\)와 별도 GRU 가중치를 가지는 전역 메모장으로, 비용은 \(O(|E| d^2 + n\, d_{\text{master}}^2)\)입니다. 두 단계면 모든 원자가 서로 닿습니다.</li>
+</ul>
+
+<div class="demo">
+  <h4>데모 7 · 누가 누구를 들을 수 있나</h4>
+  <p class="cap">행렬의 (i, j) 칸은 T단계 뒤 원자 i의 상태에 원자 j의 정보가 들어 있는지를 뜻합니다. 1-옥탄올은 무거운 원자 9개가 한 줄로 늘어선 사슬이라 그래프 지름이 8입니다.</p>
+  <div class="chips" id="d7mol"></div>
+  <div class="chips" id="d7mode"></div>
+  <div class="ctrls"><div class="ctrl"><label>메시지 전달 횟수 T <b id="d7tv"></b></label><input type="range" id="d7t" min="1" max="8" step="1" value="2"></div></div>
+  <div class="split">
+    <div><canvas id="d7g" height="220"></canvas></div>
+    <div><canvas id="d7m" height="220"></canvas></div>
+  </div>
+  <div class="readout" id="d7out"></div>
+</div>
+
+<p>거리 정보가 없는 설정(부분 전하를 노드 특징으로 넣은 실험)에서 세 가지 수정이 각각 도움이 됐습니다(본문 표 3, 13개 성질 평균 오차 비율).</p>
+<div class="tw"><table>
+<tr><th>모델</th><th class="num">평균 오차 비율</th></tr>
+<tr><td>GG-NN</td><td class="num">3.47</td></tr>
+<tr><td>GG-NN + 가상 엣지</td><td class="num">2.90</td></tr>
+<tr><td>GG-NN + 마스터 노드</td><td class="num">2.62</td></tr>
+<tr><td>GG-NN + set2set 판독</td><td class="num">2.57</td></tr>
+</table></div>
+<p class="note">부분 전하는 DFT 계산의 출력이라 실제 응용에서는 쓸 수 없는 특징이라고 논문이 직접 밝힙니다. 그래서 이 표는 “어떤 수정이 장거리 정보에 도움이 되는가”를 보는 비교로만 읽어야 합니다.</p>
+
+<!-- ───────── 8 ───────── -->
+<h2 id="s8">8. 판독: 합으로 충분한가, set2set</h2>
+<p>GG-NN의 판독은 원자마다 게이트를 곱해 더하는 식입니다.</p>
+<div class="eq">\[ R = \sum_{v \in V} \sigma\!\left(i(h_v^{(T)}, h_v^0)\right) \odot j\!\left(h_v^{(T)}\right) \qquad (4)\]
+<span class="note">\(i\), \(j\)는 신경망, \(\odot\)은 원소별 곱. 합이므로 순서 불변이지만, 결국 원자별 값을 <strong>더한 것 하나</strong>로 분자를 요약합니다.</span></div>
+<p>합은 간단하지만 정보를 잃습니다. 서로 다른 집합이 같은 합을 낼 수 있기 때문입니다. 논문은 대안으로 Vinyals 외(2015) 「Order Matters」의 <strong>set2set</strong>을 씁니다. LSTM이 쿼리 \(q\)를 만들고, 그 쿼리로 모든 원자에 어텐션을 걸어 읽은 값 \(r\)을 다시 LSTM에 넣는 일을 \(M\)번 반복합니다. 마지막 \([q; r]\)이 분자 표현입니다. 어텐션의 소프트맥스도 순서와 무관하므로 순열 불변은 그대로 유지됩니다.</p>
+<div class="eq">\[ q_t = \text{LSTM}(q^*_{t-1}),\quad a_{v,t} = \frac{\exp(h_v \cdot q_t)}{\sum_u \exp(h_u \cdot q_t)},\quad r_t = \sum_v a_{v,t}\, h_v,\quad q^*_t = [q_t;\, r_t] \]
+<span class="note">set2set 식은 「Order Matters」의 Process 블록입니다. MPNN 논문은 각 원자의 \((h_v^T, x_v)\)에 선형 사영을 건 뒤 이 계산을 \(M\)단계 돌린다고만 적었습니다.</span></div>
+
+<div class="demo">
+  <h4>데모 8 · 합이 같은 세 집합</h4>
+  <p class="cap">원자 4개짜리 집합 세 개입니다. 상태를 1차원 값으로 줄였고, 세 집합 모두 합이 2입니다. 합 판독은 셋을 구별하지 못하지만, 쿼리 q로 어텐션을 걸어 읽으면 값이 갈립니다.</p>
+  <div class="ctrls"><div class="ctrl"><label>쿼리 q <b id="d8qv"></b></label><input type="range" id="d8q" min="-3" max="3" step="0.05" value="1"></div></div>
+  <canvas id="d8c" height="210"></canvas>
+</div>
+
+<p>본문 결과에서도 판독이 중요했습니다. 논문 결론은 장거리 상호작용을 다루는 것(마스터 노드나 set2set 출력)이 중요하다고 정리하며, 최고 모델 이름 enn-s2s도 “엣지 네트워크 + set2set”의 약자입니다.</p>
+
+<!-- ───────── 9 ───────── -->
+<h2 id="s9">9. 타워: 넓은 상태를 쪼개 돌리기</h2>
+<p>모든 쌍이 연결된 그래프에서 메시지 전달 한 단계는 쌍마다 \(d \times d\) 행렬을 곱하므로 \(O(n^2 d^2)\)입니다. 5.4절의 <strong>타워</strong>는 \(d\)차원 상태를 \(d/k\)차원짜리 \(k\)개로 쪼개, 조각마다 따로 메시지 함수·갱신 함수를 둔 메시지 전달을 돌립니다. 그 뒤 모든 원자가 공유하는 신경망 \(g\)로 조각들을 섞습니다.</p>
+<div class="eq">\[ \left(h_v^{t,1}, \dots, h_v^{t,k}\right) = g\left(\tilde{h}_v^{t,1}, \dots, \tilde{h}_v^{t,k}\right) \qquad (5)\]
+<span class="note">조각 하나의 비용은 \(n^2 (d/k)^2\)이고 \(k\)개면 \(n^2 d^2 / k\)입니다. 섞는 \(g\)는 원자마다 한 번이라 쌍의 수와 무관합니다.</span></div>
+
+<div class="demo">
+  <h4>데모 9 · 타워 비용 계산기</h4>
+  <p class="cap">곱셈 수를 센 이론값입니다. 섞기 신경망 g를 d × d 층 하나로 가정했습니다. 논문이 실제로 잰 값은 k = 8, n = 9, d = 200에서 추론 시간 <strong>약 2배</strong> 단축이었습니다.</p>
+  <div class="ctrls">
+    <div class="ctrl"><label>원자 수 n <b id="d9nv"></b></label><input type="range" id="d9n" min="5" max="60" step="1" value="9"></div>
+    <div class="ctrl"><label>상태 차원 d <b id="d9dv"></b></label><input type="range" id="d9d" min="40" max="400" step="8" value="200"></div>
+    <div class="ctrl"><label>타워 수 k <b id="d9kv"></b></label><input type="range" id="d9k" min="0" max="5" step="1" value="3"></div>
+  </div>
+  <canvas id="d9c" height="120"></canvas>
+  <div class="readout" id="d9out"></div>
+</div>
+<p>타워는 속도만이 아니라 성능도 올렸습니다. 조각마다 조금씩 다른 관점을 배우고 주기적으로 섞으니 논문 표현으로 “앙상블을 학습하는 것과 닮았”습니다. 거리 구간 입력에서 13개 중 12개 성질이 좋아졌습니다(본문 표 4).</p>
+<div class="tw"><table>
+<tr><th>모델</th><th>학습 방식</th><th class="num">평균 오차 비율</th></tr>
+<tr><td>GG-NN</td><td>13개 성질 동시 학습</td><td class="num">1.92</td></tr>
+<tr><td>타워 8개</td><td>13개 성질 동시 학습</td><td class="num">1.75</td></tr>
+<tr><td>GG-NN</td><td>성질별 따로 학습</td><td class="num">1.53</td></tr>
+<tr><td>타워 8개</td><td>성질별 따로 학습</td><td class="num"><strong>1.37</strong></td></tr>
+</table></div>
+<p>성질마다 따로 학습한 모델이 13개를 한꺼번에 맞히는 모델보다 나았다는 점도 같이 보입니다. 최종 결과(10절)는 성질별로 따로 학습한 모델입니다.</p>
+
+<!-- ───────── 10 ───────── -->
+<h2 id="s10">10. QM9 결과</h2>
+<p>QM9는 H, C, N, O, F로 이루어지고 무거운 원자가 9개 이하인 분자 130,462개에 DFT로 계산한 성질 13개를 붙인 데이터셋입니다. 검증 10,000개, 시험 10,000개, 나머지 110,462개로 학습합니다. 성질은 네 무리입니다: 원자화 에너지 네 개(\(U_0\), \(U\), \(H\), \(G\)), 진동(\(\omega_1\), ZPVE), 전자(HOMO, LUMO, 간격), 공간(\(R^2\), \(\mu\), \(\alpha\)), 그리고 열용량 \(C_v\).</p>
+<p>성질마다 단위가 달라서 논문은 <strong>오차 비율</strong> = MAE ÷ 화학적 정확도로 비교합니다. 화학적 정확도는 화학 분야에서 쓸 만하다고 보는 목표 오차(Faber 외 2017의 추정값)이고, 오차 비율이 1보다 작으면 그 성질에서 화학적 정확도에 도달한 것입니다.</p>
+
+<div class="demo">
+  <h4>데모 10 · 표 2: 성질별 오차 비율</h4>
+  <p class="cap">세로축은 로그 눈금이고, 점선이 화학적 정확도(오차 비율 1)입니다. 칩을 눌러 방법을 켜고 끄세요. ECFP4는 R², ZPVE, 원자화 에너지에서 85~242까지 치솟아 기본으로 꺼 두었습니다. DTNN은 다른 분할(학습 100k)에서 G만 보고해(0.84) 그래프에서 뺐습니다.</p>
+  <div class="chips" id="d10m"></div>
+  <canvas id="d10c" height="300"></canvas>
+  <div class="readout" id="d10out"></div>
+</div>
+
+<div class="tw"><table id="t2"></table></div>
+<p>논문의 결론 한 문장: 새 MPNN은 <strong>13개 성질 모두에서 최고 성능</strong>을 냈고 <strong>11개에서 화학적 정확도</strong>에 도달했습니다. 남은 두 개는 HOMO–LUMO 간격(1.60)과 ZPVE(1.27)입니다. 검증 오차가 가장 낮은 다섯 모델을 앙상블한 enn-s2s-ens5는 평균 오차 비율을 0.68에서 0.52로 더 낮췄습니다.</p>
+
+<h3>데이터를 얼마나 모아야 하나</h3>
+<p>부록 표 6은 같은 enn-s2s를 학습 데이터 크기만 바꿔 학습한 결과입니다. 논문은 \(R^2\)와 \(\omega_1\)에서 <strong>11k개만으로도</strong> 최고 기존 방법이 110k개로 낸 결과와 같거나 낫다고 적었습니다.</p>
+<div class="demo">
+  <h4>데모 10-2 · 학습 데이터 크기와 오차 비율</h4>
+  <p class="cap">성질을 고르면 진하게 표시됩니다. 점선은 그 성질에서 기존 방법 중 가장 좋은 값(표 2, 110k 학습)입니다.</p>
+  <select id="d10s"></select>
+  <canvas id="d10b" height="240"></canvas>
+</div>
+
+<!-- ───────── 11 ───────── -->
+<h2 id="s11">11. 브라우저에서 학습하는 MPNN: T는 몇이면 되나</h2>
+<p>이제 MPNN을 직접 학습시켜 봅니다. QM9를 브라우저에서 돌릴 수는 없으니, 장거리 정보가 필요한 장난감 과제를 만들었습니다. 무거운 원자 6~9개짜리 나무 모양 분자(C 60%, N 20%, O 20%)에서 <strong>그래프 거리가 정확히 3인 헤테로원자(N·O) 쌍의 수</strong>를 맞히는 과제입니다. 원자 셋을 사이에 둔 짝을 세야 하므로, 메시지를 몇 번 주고받아야 하는지가 그대로 드러납니다.</p>
+<div class="eq">\[ h_v^0 = E_{\text{종류}(v)},\quad h_v^{t+1} = \tanh\!\Big(U h_v^t + A \sum_{w \in N(v)} h_w^t + b\Big),\quad \hat{y} = \sum_v w^\top \tanh(R\, h_v^T + c) + b_0 \]
+<span class="note">\(d = 16\), 가중치는 \(t\)에 공유(논문과 같음), 손실은 MSE, Adam. 학습 그래프 2,000개, 시험 그래프 400개. T = 1, 2, 3인 모델 셋을 같은 데이터로 동시에 학습합니다.</span></div>
+
+<div class="demo">
+  <h4>데모 11 · T = 1, 2, 3 동시 학습</h4>
+  <p class="cap">시험 MAE(낮을수록 좋음)를 그립니다. 회색 점선은 항상 평균을 답하는 기준선입니다. 아래 예시 분자에서 빨간 선으로 이은 쌍이 정답에 세는 쌍입니다.</p>
+  <div class="btns"><button id="d11go">학습 시작</button><button id="d11reset">초기화</button><button id="d11next">다른 예시 분자</button></div>
+  <canvas id="d11c" height="220"></canvas>
+  <div class="legend"><span><i style="background:var(--s2)"></i>T = 1</span><span><i style="background:var(--s3)"></i>T = 2</span><span><i style="background:var(--s1)"></i>T = 3</span><span><i style="background:var(--axis)"></i>평균 기준선</span></div>
+  <canvas id="d11g" height="200"></canvas>
+  <div class="readout" id="d11out"></div>
+</div>
+
+<div class="key"><span class="lbl">관찰</span><p>T = 1은 기준선 근처에서 멈추고, T = 2부터 정답에 붙습니다. 거리 3짜리 쌍을 세는데 T = 3이 아니라 2면 되는 이유는 <strong>판독</strong>에 있습니다. 경로 a–b–c–d에서 b는 두 단계면 a(1칸)와 d(2칸)를 모두 봅니다. 쌍의 양 끝을 동시에 보는 원자가 하나만 있으면 합 판독이 그 원자의 출력을 모아 세면 됩니다. 그래서 거리 K인 관계에는 대략 ⌈K/2⌉ 단계가 필요합니다. 논문의 하이퍼파라미터 탐색에서 T는 3~8 범위였고, 논문은 “실제로는 T ≥ 3이면 어느 값이든 된다”고 적었습니다. QM9 분자는 작고, 거리 엣지를 쓰면 그래프가 완전 그래프라서 그렇습니다.</p></div>
+
+<!-- ───────── 12 ───────── -->
+<h2 id="s12">12. MPNN 이후</h2>
+<p>논문이 결론에서 남긴 숙제는 두 가지입니다. 하나는 <strong>학습 때보다 큰 그래프로 일반화</strong>하는 것입니다. 공간 정보를 쓰는 좋은 표현은 그래프를 완전 연결로 만들어 원자 하나가 받는 메시지 수가 n에 따라 달라지고, 원자 간 거리 분포도 원자 수에 크게 의존합니다. 다른 하나는 들어오는 메시지에 <strong>어텐션</strong>을 거는 것입니다. 모든 이웃 메시지를 그냥 더하지 말고 무엇을 더 들을지 고르자는 것입니다.</p>
+<ul>
+<li><strong>SchNet</strong>(Schütt 외, 2017): 거리를 연속 필터로 받는 합성곱. 엣지 네트워크의 “거리 → 가중치” 발상을 물리적으로 다듬은 셈입니다.</li>
+<li><strong>DimeNet</strong>(Klicpera 외, 2020): 원자 사이가 아니라 <strong>결합 사이</strong>로 메시지를 보내 결합 각도까지 모델링합니다.</li>
+<li><strong>그래프 어텐션·그래프 트랜스포머</strong>: 메시지 합에 어텐션 가중치를 넣은 것으로, 논문이 제안한 방향 그대로입니다. 트랜스포머의 셀프 어텐션 자체도 완전 그래프 위의 메시지 전달로 읽을 수 있습니다.</li>
+</ul>
+<p>이후 그래프 모델들은 메시지 함수를 어텐션이나 물리 방정식으로 바꾸거나 보강했지만, “노드가 엣지를 통해 메시지를 주고받고, 순서와 무관하게 모은다”는 뼈대는 그대로입니다. 이 뼈대에 이름과 식을 붙인 것이 이 논문입니다.</p>
+
+<!-- ───────── 13 ───────── -->
+<h2 id="s13">13. 확인 퀴즈</h2>
+<div id="quiz"></div>
+<p class="quiz-score" id="quizScore"></p>
+
+<footer>
+<p><strong>참고 문헌</strong></p>
+<ul class="refs">
+<li>Gilmer, Schoenholz, Riley, Vinyals &amp; Dahl (2017), <em>Neural Message Passing for Quantum Chemistry</em>, ICML 2017 — <a href="https://arxiv.org/abs/1704.01212" target="_blank" rel="noopener">arXiv:1704.01212</a></li>
+<li>Li, Tarlow, Brockschmidt &amp; Zemel (2016), <em>Gated Graph Sequence Neural Networks</em>, ICLR 2016 — <a href="https://arxiv.org/abs/1511.05493" target="_blank" rel="noopener">arXiv:1511.05493</a></li>
+<li>Duvenaud 외 (2015), <em>Convolutional Networks on Graphs for Learning Molecular Fingerprints</em>, NIPS 2015 — <a href="https://arxiv.org/abs/1509.09292" target="_blank" rel="noopener">arXiv:1509.09292</a></li>
+<li>Battaglia 외 (2016), <em>Interaction Networks for Learning about Objects, Relations and Physics</em>, NIPS 2016 — <a href="https://arxiv.org/abs/1612.00222" target="_blank" rel="noopener">arXiv:1612.00222</a></li>
+<li>Kearnes 외 (2016), <em>Molecular Graph Convolutions: Moving Beyond Fingerprints</em> — <a href="https://arxiv.org/abs/1603.00856" target="_blank" rel="noopener">arXiv:1603.00856</a></li>
+<li>Schütt 외 (2017), <em>Quantum-chemical insights from deep tensor neural networks</em>, Nature Communications</li>
+<li>Kipf &amp; Welling (2017), <em>Semi-Supervised Classification with Graph Convolutional Networks</em>, ICLR 2017 — <a href="https://arxiv.org/abs/1609.02907" target="_blank" rel="noopener">arXiv:1609.02907</a></li>
+<li>Vinyals, Bengio &amp; Kudlur (2016), <em>Order Matters: Sequence to sequence for sets</em>, ICLR 2016 — <a href="https://arxiv.org/abs/1511.06391" target="_blank" rel="noopener">arXiv:1511.06391</a></li>
+<li>Ramakrishnan 외 (2014), <em>Quantum chemistry structures and properties of 134 kilo molecules</em>, Scientific Data</li>
+<li>Faber 외 (2017), <em>Prediction errors of molecular machine learning models lower than hybrid DFT error</em> — <a href="https://arxiv.org/abs/1702.05532" target="_blank" rel="noopener">arXiv:1702.05532</a></li>
+<li>Schütt 외 (2017), <em>SchNet: A continuous-filter convolutional neural network for modeling quantum interactions</em>, NIPS 2017 — <a href="https://arxiv.org/abs/1706.08566" target="_blank" rel="noopener">arXiv:1706.08566</a></li>
+<li>Klicpera, Groß &amp; Günnemann (2020), <em>Directional Message Passing for Molecular Graphs</em>, ICLR 2020 — <a href="https://arxiv.org/abs/2003.03123" target="_blank" rel="noopener">arXiv:2003.03123</a></li>
+</ul>
+<p style="margin-top:18px"><a href="https://github.com/dev-jonghoonpark/how-ai-works">how-ai-works</a> 시리즈 · 모든 계산과 학습은 브라우저에서 실시간으로 이루어집니다.</p>
+</footer>
+</div>
+<script src="mpnn.js"></script>
+<script>
+var $=function(s){return document.querySelector(s);};
+var cssCache={};
+function css(n){if(!(n in cssCache))cssCache[n]=getComputedStyle(document.documentElement).getPropertyValue(n).trim();return cssCache[n];}
+function setup(c){var dpr=window.devicePixelRatio||1,w=c.clientWidth,h=+c.getAttribute('height');
+  c.style.height=h+'px';c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);var g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.font='12px system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif';return {g:g,w:w,h:h};}
+function onFrame(f){var p=false;return function(){if(p)return;p=true;requestAnimationFrame(function(){p=false;f();});};}
+function fmt(x,k){return (x>=0?'+':'−')+Math.abs(x).toFixed(k==null?2:k);}
+function vecStr(v,k){return '['+v.map(function(x){return fmt(x,k);}).join(', ')+']';}
+function tex(s,disp){return window.katex?katex.renderToString(s,{throwOnError:false,displayMode:!!disp}):s;}
+function elColor(el){return css('--el-'+(el==='M'?'M':el))||css('--text-secondary');}
+function chips(box,items,sel,onPick,multi){
+  box.innerHTML='';
+  items.forEach(function(it){var b=document.createElement('button');b.type='button';
+    b.innerHTML=(it.color?'<i style="background:'+it.color+'"></i>':'')+it.label;
+    b.setAttribute('aria-pressed',multi?String(!!it.on):String(it.key===sel));
+    b.addEventListener('click',function(){
+      if(multi){it.on=!it.on;b.setAttribute('aria-pressed',String(it.on));}
+      else box.querySelectorAll('button').forEach(function(x,i){x.setAttribute('aria-pressed',String(items[i].key===it.key));});
+      onPick(it.key);});
+    box.appendChild(b);});
+}
+var MOLKEYS=['ethanol','acetic','acetonitrile','glycine','pyridine','benzene','octanol'];
+function molItems(){return MOLKEYS.map(function(k){return {key:k,label:MP.MOLS[k].name};});}
+
+/* 분자 그리기: 좌표를 캔버스에 맞추고 결합을 선 개수로 표시 */
+function layout(m,W,H,pad){
+  var xs=m.atoms.map(function(a){return a.x;}),ys=m.atoms.map(function(a){return a.y;});
+  var x0=Math.min.apply(null,xs),x1=Math.max.apply(null,xs),y0=Math.min.apply(null,ys),y1=Math.max.apply(null,ys);
+  var s=Math.min((W-2*pad)/Math.max(1,x1-x0),(H-2*pad)/Math.max(1,y1-y0),70);
+  var ox=(W-(x1-x0)*s)/2,oy=(H-(y1-y0)*s)/2;
+  return m.atoms.map(function(a){return {x:ox+(a.x-x0)*s,y:H-(oy+(a.y-y0)*s)};});
+}
+function drawBond(g,p,q,t,col,lw){
+  g.strokeStyle=col;g.lineWidth=lw||2;var dx=q.x-p.x,dy=q.y-p.y,L=Math.hypot(dx,dy),nx=-dy/L*4,ny=dx/L*4;
+  var offs=t===2?[-0.6,0.6]:t===3?[-1.1,0,1.1]:[0];
+  offs.forEach(function(o){g.beginPath();g.moveTo(p.x+nx*o,p.y+ny*o);g.lineTo(q.x+nx*o,q.y+ny*o);g.stroke();});
+  if(t===4){g.setLineDash([3,3]);g.beginPath();g.moveTo(p.x+nx*1.1,p.y+ny*1.1);g.lineTo(q.x+nx*1.1,q.y+ny*1.1);g.stroke();g.setLineDash([]);}
+}
+function drawAtom(g,p,a,r,opts){
+  opts=opts||{};
+  g.globalAlpha=opts.alpha==null?1:opts.alpha;
+  g.beginPath();g.arc(p.x,p.y,r,0,7);g.fillStyle=css('--surface-1');g.fill();
+  g.lineWidth=opts.ring?3:1.6;g.strokeStyle=opts.ring?css('--s1'):elColor(a.el);g.stroke();
+  if(opts.fill){g.globalAlpha=(opts.alpha==null?1:opts.alpha)*0.18;g.fillStyle=elColor(a.el);g.fill();g.globalAlpha=opts.alpha==null?1:opts.alpha;}
+  g.fillStyle=elColor(a.el);g.font='600 13px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';
+  g.fillText(opts.text||a.el,p.x,p.y+0.5);
+  if(opts.sub!=null){g.textAlign='left';g.font='10.5px system-ui,sans-serif';g.fillStyle=css('--muted');g.fillText(opts.sub,p.x+r+5,p.y-r+2);}
+  g.globalAlpha=1;g.textAlign='left';g.textBaseline='alphabetic';
+}
+function hitAtom(P,x,y,r){for(var i=0;i<P.length;i++)if(Math.hypot(P[i].x-x,P[i].y-y)<r+4)return i;return -1;}
+function canvasXY(c,e){var b=c.getBoundingClientRect();return {x:e.clientX-b.left,y:e.clientY-b.top};}
+
+/* ══════ 데모 1: 스크리닝 시간 ══════ */
+function humanTime(s){
+  if(s<1)return (s*1000).toFixed(s<0.01?2:0)+' ms';if(s<60)return s.toFixed(1)+' 초';if(s<3600)return (s/60).toFixed(1)+' 분';
+  if(s<86400)return (s/3600).toFixed(1)+' 시간';if(s<86400*365)return (s/86400).toFixed(1)+' 일';return (s/86400/365).toFixed(1)+' 년';}
+function fmtInt(x){return Math.round(x).toLocaleString('ko-KR');}
+function drawD1(){
+  var n=Math.pow(10,+$('#d1n').value),cores=Math.pow(10,+$('#d1c').value);
+  $('#d1nv').textContent=fmtInt(n)+'개';$('#d1cv').textContent=fmtInt(cores)+'개';
+  var dft=n*3600/cores,nn=dft/3e5;
+  $('#d1out').innerHTML='<span>DFT<b>'+humanTime(dft)+'</b></span><span>MPNN 추론<b>'+humanTime(nn)+'</b></span><span>DFT 코어·시간<b>'+fmtInt(n)+'</b></span>';
+  var C=setup($('#d1cv2')),g=C.g,W=C.w,lo=-3,hi=Math.log10(3600*24*365*1e4);
+  function X(s){return 90+(W-110)*(Math.log10(Math.max(s,1e-3))-lo)/(hi-lo);}
+  g.strokeStyle=css('--grid');g.fillStyle=css('--muted');g.font='11px system-ui,sans-serif';
+  [[1e-3,'1ms'],[1,'1초'],[60,'1분'],[3600,'1시간'],[86400,'1일'],[86400*365,'1년'],[86400*365*100,'100년']].forEach(function(t){
+    var x=X(t[0]);g.beginPath();g.moveTo(x,10);g.lineTo(x,92);g.stroke();g.fillText(t[1],x-10,108);});
+  [[dft,'DFT',css('--s2'),24],[nn,'MPNN',css('--s1'),62]].forEach(function(b){
+    g.fillStyle=b[2];g.fillRect(90,b[3],Math.max(2,X(b[0])-90),22);g.fillStyle=css('--text-primary');g.font='600 12.5px system-ui,sans-serif';g.fillText(b[1],10,b[3]+15);});
+}
+$('#d1n').addEventListener('input',onFrame(drawD1));$('#d1c').addEventListener('input',onFrame(drawD1));
+
+/* ══════ 데모 2: 분자를 입력으로 ══════ */
+var D2={mol:'glycine',sel:2};
+chips($('#d2mol'),molItems(),D2.mol,function(k){D2.mol=k;D2.sel=0;drawD2();});
+function drawD2(){
+  var m=MP.MOLS[D2.mol],C=setup($('#d2c')),g=C.g,P=layout(m,C.w,C.h,46),r=17;D2.P=P;
+  m.b.forEach(function(e){drawBond(g,P[e[0]],P[e[1]],e[2],css('--axis'),2);});
+  m.atoms.forEach(function(a,i){if(i!==D2.sel){g.setLineDash([2,4]);g.strokeStyle=css('--grid');g.lineWidth=1;g.beginPath();g.moveTo(P[D2.sel].x,P[D2.sel].y);g.lineTo(P[i].x,P[i].y);g.stroke();g.setLineDash([]);}});
+  m.atoms.forEach(function(a,i){drawAtom(g,P[i],a,r,{ring:i===D2.sel,fill:true,sub:i,text:a.el+(a.h?'H'+(a.h>1?a.h:''):'')});});
+  var a=m.atoms[D2.sel],f=MP.atomFeatures(a);
+  $('#d2feat').innerHTML='<div class="row"><span>원자 '+D2.sel+' ('+a.el+', 수소 '+a.h+'개)</span><span class="vec">x = ['+MP.featVec(a).join(', ')+']</span></div>'+
+    '<div class="row"><span></span><span class="mono" style="color:var(--muted)">종류 H C N O F | 원자번호 | 받개 | 주개 | 방향족 | sp sp² sp³ | 수소 수</span></div>';
+  var adj=MP.adjacency(m),bond={};adj[D2.sel].forEach(function(e){bond[e.w]=e.t;});
+  var h='<tr><th>상대 원자</th><th class="num">거리(Å, 근사)</th><th>① 화학 그래프</th><th>② 거리 구간 라벨</th><th>③ 실수 거리 [d, 결합 4칸]</th></tr>';
+  m.atoms.forEach(function(b,j){if(j===D2.sel)return;var d=MP.eucl(m,D2.sel,j),t=bond[j];
+    var oh=[1,2,3,4].map(function(k){return t===k?1:0;});
+    h+='<tr><td>'+j+' ('+b.el+')</td><td class="num">'+d.toFixed(2)+'</td><td>'+(t?MP.BOND_NAME[t]+' 결합':'<span style="color:var(--muted)">엣지 없음</span>')+'</td><td>'+
+      (t?'결합: '+MP.BOND_NAME[t]:'거리 구간 '+MP.binLabel(MP.distBin(d)))+'</td><td class="mono">['+d.toFixed(2)+', '+oh.join(', ')+']</td></tr>';});
+  $('#d2tab').innerHTML=h;
+}
+$('#d2c').addEventListener('click',function(e){var p=canvasXY(this,e),i=hitAtom(D2.P,p.x,p.y,17);if(i>=0){D2.sel=i;drawD2();}});
+
+/* ══════ 데모 3: 메시지 전달 단계 ══════ */
+var TOY=new MP.ToyMPNN(4,11);
+var D3={mol:'ethanol',sel:2};
+chips($('#d3mol'),molItems(),D3.mol,function(k){D3.mol=k;D3.sel=0;drawD3();});
+function drawHBars(g,x,y,h){var bw=6,gap=2,tot=h.length*(bw+gap)-gap,x0=x-tot/2;
+  h.forEach(function(v,k){var hh=Math.abs(v)*14;g.fillStyle=v>=0?css('--s1'):css('--s2');g.fillRect(x0+k*(bw+gap),v>=0?y-hh:y,bw,hh);});
+  g.strokeStyle=css('--axis');g.lineWidth=1;g.beginPath();g.moveTo(x0-2,y);g.lineTo(x0+tot+2,y);g.stroke();}
+function drawD3(){
+  var m=MP.MOLS[D3.mol],t=+$('#d3t').value;$('#d3tv').textContent=t;
+  var run=TOY.run(m,Math.max(t,1)),adj=run.adj,D=MP.graphDist(m.atoms.length,adj)[D3.sel];
+  var C=setup($('#d3c')),g=C.g,P=layout(m,C.w,C.h-30,40),r=16;D3.P=P;
+  m.b.forEach(function(e){var hot=t>0&&(e[0]===D3.sel||e[1]===D3.sel);drawBond(g,P[e[0]],P[e[1]],e[2],hot?css('--s1'):css('--axis'),hot?2.6:2);});
+  m.atoms.forEach(function(a,i){var reached=D[i]<=t;
+    drawAtom(g,P[i],a,r,{ring:i===D3.sel,fill:reached,alpha:reached?1:0.35,sub:D[i]===Infinity?'':'거리 '+D[i]});
+    drawHBars(g,P[i].x,P[i].y+r+21,run.H[t][i]);});
+  var n=m.atoms.length,cnt=D.filter(function(x){return x<=t;}).length;
+  g.fillStyle=css('--text-secondary');g.font='12.5px system-ui,sans-serif';
+  g.fillText('t = '+t+' · 원자 '+D3.sel+'의 상태에 정보가 들어온 원자 '+cnt+' / '+n,10,C.h-8);
+  var out='';
+  if(t===0){out='<div class="row"><span>h⁰ (원자 '+D3.sel+')</span><span class="vec">'+vecStr(run.H[0][D3.sel])+'</span></div><div class="row"><span></span><span style="color:var(--muted)">t = 0에는 자기 특징만 압니다. t를 올려 보세요.</span></div>';}
+  else{
+    var ms=run.M[t-1][D3.sel];
+    ms.parts.forEach(function(p){out+='<div class="row"><span>A<sub>'+MP.BOND_NAME[p.t]+'</sub> · h<sub>'+p.w+'</sub><sup>'+(t-1)+'</sup> ('+m.atoms[p.w].el+')</span><span class="vec">'+vecStr(p.msg)+'</span></div>';});
+    out+='<div class="row"><span><strong>m<sub>'+D3.sel+'</sub><sup>'+t+'</sup></strong> = 합</span><span class="vec">'+vecStr(ms.m)+'</span></div>';
+    out+='<div class="row"><span>h<sub>'+D3.sel+'</sub><sup>'+(t-1)+'</sup> (이전 상태)</span><span class="vec">'+vecStr(run.H[t-1][D3.sel])+'</span></div>';
+    out+='<div class="row"><span><strong>h<sub>'+D3.sel+'</sub><sup>'+t+'</sup></strong> = tanh(W h + m + b)</span><span class="vec">'+vecStr(run.H[t][D3.sel])+'</span></div>';
+  }
+  $('#d3calc').innerHTML=out;
+}
+$('#d3t').addEventListener('input',onFrame(drawD3));
+$('#d3c').addEventListener('click',function(e){var p=canvasXY(this,e),i=hitAtom(D3.P,p.x,p.y,16);if(i>=0){D3.sel=i;drawD3();}});
+
+/* ══════ 데모 4: 순열 불변 ══════ */
+var D4={mol:'glycine',perm:null};
+var RW=(function(){var r=MP.rng(99),w=[];for(var i=0;i<4;i++)w.push(MP.gauss(r)*0.6);var c=[];for(i=0;i<4*9;i++)c.push(MP.gauss(r)*0.6);return {w:w,c:c};})();
+chips($('#d4mol'),molItems(),D4.mol,function(k){D4.mol=k;D4.perm=null;drawD4();});
+function permuted(m,perm){/* perm[새 번호] = 옛 번호 */
+  var inv=[];perm.forEach(function(o,nw){inv[o]=nw;});
+  return {atoms:perm.map(function(o){return m.atoms[o];}),b:m.b.map(function(e){return [inv[e[0]],inv[e[1]],e[2]];})};}
+function drawD4(){
+  var m0=MP.MOLS[D4.mol],n=m0.atoms.length;if(!D4.perm){D4.perm=[];for(var i=0;i<n;i++)D4.perm.push(i);}
+  var m=permuted(m0,D4.perm),run=TOY.run(m,3),H=run.H[3];
+  var sum=0;H.forEach(function(h){h.forEach(function(x,k){sum+=RW.w[k]*x;});});
+  var cat=0;H.forEach(function(h,v){h.forEach(function(x,k){cat+=RW.c[v*4+k]*x;});});
+  var C=setup($('#d4c')),g=C.g,P=layout(m,C.w,C.h,40),r=16;
+  m.b.forEach(function(e){drawBond(g,P[e[0]],P[e[1]],e[2],css('--axis'),2);});
+  m.atoms.forEach(function(a,i){drawAtom(g,P[i],a,r,{fill:true,text:String(i)});drawHBars(g,P[i].x,P[i].y+r+21,H[i]);});
+  var base=D4.base&&D4.base.mol===D4.mol?D4.base:null;
+  if(!base||D4.perm.every(function(x,i){return x===i;})){D4.base={mol:D4.mol,sum:sum,cat:cat};base=D4.base;}
+  $('#d4out').innerHTML='<span>번호 순서(옛 번호)<b class="mono" style="font-size:14px">'+D4.perm.join(' ')+'</b></span>'+
+    '<span>합 판독<b>'+sum.toFixed(6)+'</b><small>원래와 차이 '+Math.abs(sum-base.sum).toExponential(1)+'</small></span>'+
+    '<span>이어 붙이기 판독<b>'+cat.toFixed(6)+'</b><small>원래와 차이 '+Math.abs(cat-base.cat).toFixed(4)+'</small></span>';
+}
+$('#d4shuf').addEventListener('click',function(){var p=D4.perm.slice();for(var i=p.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=p[i];p[i]=p[j];p[j]=t;}D4.perm=p;drawD4();});
+$('#d4reset').addEventListener('click',function(){D4.perm=null;drawD4();});
+
+/* ══════ 데모 5: 여덟 모델 ══════ */
+var MODELS=[
+ {key:'duv',label:'Duvenaud 외 2015',M:'M(h_v,h_w,e_{vw}) = (h_w,\\, e_{vw})',U:'U_t(h_v^t, m_v^{t+1}) = \\sigma\\!\\left(H_t^{\\deg(v)}\\, m_v^{t+1}\\right)',R:'R = f\\Big(\\sum_{v,t} \\operatorname{softmax}(W_t h_v^t)\\Big)',
+  n:'분자 지문(ECFP)을 미분 가능하게 만든 모델. 차수(이웃 수)마다 다른 행렬 H를 쓰고, 모든 단계의 상태를 판독에 씁니다. 논문은 메시지가 이웃 상태의 합과 엣지 특징의 합으로 따로 들어가 <strong>엣지와 노드 상태의 상관을 잡지 못한다</strong>고 지적합니다.'},
+ {key:'ggnn',label:'GG-NN (Li 외 2016)',M:'M_t(h_v^t,h_w^t,e_{vw}) = A_{e_{vw}}\\, h_w^t',U:'U_t = \\operatorname{GRU}(h_v^t,\\, m_v^{t+1})',R:'R = \\sum_{v} \\sigma\\!\\left(i(h_v^{(T)}, h_v^0)\\right) \\odot j\\!\\left(h_v^{(T)}\\right)',
+  n:'엣지 라벨마다 행렬 하나, GRU 갱신, 단계 간 가중치 공유. 이 논문의 기준선이자 출발점입니다. 논문의 모든 실험은 GG-NN처럼 GRU 갱신과 가중치 공유를 씁니다.'},
+ {key:'in',label:'상호작용 네트워크 (Battaglia 외 2016)',M:'M(h_v,h_w,e_{vw}) = \\mathrm{NN}(h_v,\\, h_w,\\, e_{vw})',U:'U(h_v, x_v, m_v) = \\mathrm{NN}(h_v,\\, x_v,\\, m_v)',R:'R = f\\Big(\\sum_{v \\in G} h_v^T\\Big)',
+  n:'물리 시뮬레이션용 모델. 메시지가 받는 쪽 상태 h_v에도 의존합니다(6절의 “쌍 메시지”가 여기서 왔습니다). x_v는 노드마다 들어오는 외부 입력이고, 원 논문은 T = 1만 썼습니다.'},
+ {key:'kea',label:'분자 그래프 합성곱 (Kearnes 외 2016)',M:'M(h_v^t,h_w^t,e_{vw}^t) = e_{vw}^t',U:'U_t(h_v^t, m_v^{t+1}) = \\alpha\\!\\left(W_1\\big(\\alpha(W_0 h_v^t),\\, m_v^{t+1}\\big)\\right)',R:'e_{vw}^{t+1} = \\alpha\\!\\left(W_4\\big(\\alpha(W_2 e_{vw}^t),\\, \\alpha(W_3(h_v^t, h_w^t))\\big)\\right)',
+  n:'여덟 모델 중 유일하게 <strong>엣지 상태도 학습해 갱신</strong>합니다(위 세 번째 줄은 판독이 아니라 엣지 갱신식입니다). 메시지는 엣지 상태 그 자체이고, α는 ReLU입니다.'},
+ {key:'dtnn',label:'DTNN (Schütt 외 2017)',M:'M_t = \\tanh\\!\\left(W^{fc}\\big((W^{cf} h_w^t + b_1) \\odot (W^{df} e_{vw} + b_2)\\big)\\right)',U:'U_t(h_v^t, m_v^{t+1}) = h_v^t + m_v^{t+1}',R:'R = \\sum_v \\mathrm{NN}(h_v^T)',
+  n:'거리 행렬을 입력으로 받는 모델. 갱신이 잔차 덧셈 하나뿐이고, 판독은 원자마다 은닉층 하나짜리 신경망을 돌려 더합니다.'},
+ {key:'spec',label:'스펙트럼 합성곱 (Bruna 외 · Defferrard 외)',M:'M_t(h_v^t, h_w^t) = C_{vw}^t\\, h_w^t',U:'U_t(h_v^t, m_v^{t+1}) = \\sigma(m_v^{t+1})',R:'\\text{(노드 분류용: 그래프 판독 없음)}',
+  n:'그래프 라플라시안의 고유벡터로 정의한 합성곱. 계수 C는 라플라시안 고유벡터와 학습 파라미터로 정해집니다. 부록 10.1이 이 모델들이 메시지 전달 형태로 다시 쓰인다는 것을 보입니다.'},
+ {key:'gcn',label:'GCN (Kipf & Welling 2017)',M:'M_t(h_v^t, h_w^t) = c_{vw}\\, h_w^t,\\quad c_{vw} = \\big(\\deg(v)\\deg(w)\\big)^{-1/2} A_{vw}',U:'U_t(h_v^t, m_v^{t+1}) = \\operatorname{ReLU}(W^t m_v^{t+1})',R:'\\text{(노드 분류용: 그래프 판독 없음)}',
+  n:'메시지 가중치가 스칼라 하나라 사실상 <strong>차수로 정규화한 이웃 평균</strong>입니다. 엣지 특징을 쓰지 않습니다.'},
+ {key:'enn',label:'★ 이 논문의 최고 모델 (enn-s2s)',M:'M(h_v,h_w,e_{vw}) = A(e_{vw})\\, h_w',U:'U_t = \\operatorname{GRU}(h_v^t,\\, m_v^{t+1})',R:'R = \\operatorname{set2set}\\big(\\{(h_v^T, x_v)\\}\\big)',
+  n:'GG-NN에서 두 칸을 바꿨습니다. 메시지 행렬을 엣지 벡터(실수 거리 포함)로부터 신경망이 만들고(6절), 판독을 set2set으로 바꿨습니다(8절). 이름 그대로 <strong>e</strong>dge <strong>n</strong>etwork <strong>n</strong>etwork + <strong>s</strong>et<strong>2s</strong>et입니다.'}
+];
+var D5={sel:'ggnn'};
+chips($('#d5btn'),MODELS.map(function(m){return {key:m.key,label:m.label};}),D5.sel,function(k){D5.sel=k;drawD5();});
+function drawD5(){var m=MODELS.filter(function(x){return x.key===D5.sel;})[0];
+  $('#d5fx').innerHTML='<div><span class="lbl">M</span> '+tex(m.M)+'</div><div><span class="lbl">U</span> '+tex(m.U)+'</div><div><span class="lbl">'+(m.key==='kea'?'e':'R')+'</span> '+tex(m.R)+'</div>';
+  $('#d5note').innerHTML=m.n;}
+
+/* ══════ 데모 6: 거리 구간 vs 엣지 네트워크 ══════ */
+var EN=(function(){var r=MP.rng(5),W1=[],b1=[],W2=[],b2=[],B=[],i,H=8;
+  for(i=0;i<H;i++){W1.push(MP.gauss(r)*3);b1.push(MP.gauss(r)*4);}
+  for(i=0;i<16*H;i++)W2.push(MP.gauss(r)*0.9);for(i=0;i<16;i++)b2.push(MP.gauss(r)*0.2);
+  /* 구간 행렬은 구간 가운데 거리에서 잰 엣지 네트워크 값에 잡음을 더한 것: 비슷하지만 계단이다 */
+  return {A:function(d){var h=[];for(var k=0;k<H;k++)h.push(Math.tanh(W1[k]*d/3+b1[k]/2));
+      var o=[];for(var q=0;q<16;q++){var s=b2[q];for(k=0;k<H;k++)s+=W2[q*H+k]*h[k];o.push(Math.tanh(s));}return o;},
+    rB:r};})();
+var BINM=(function(){var out=[];for(var k=0;k<10;k++){var c=k===0?1.4:k===9?7:2+(k-1)*0.5+0.25;out.push(EN.A(c).map(function(x){return Math.max(-1,Math.min(1,x+MP.gauss(EN.rB)*0.08));}));}return out;})();
+function heat(g,x0,y0,s,M){for(var i=0;i<4;i++)for(var j=0;j<4;j++){var v=M[i*4+j];
+  g.fillStyle=v>=0?css('--s1'):css('--s2');g.globalAlpha=0.12+0.88*Math.min(1,Math.abs(v));g.fillRect(x0+j*s,y0+i*s,s-2,s-2);g.globalAlpha=1;
+  g.fillStyle=css('--text-primary');g.font='10.5px ui-monospace,monospace';g.textAlign='center';g.fillText(v.toFixed(2),x0+j*s+s/2-1,y0+i*s+s/2+3);}g.textAlign='left';}
+function drawD6(){
+  var d=+$('#d6d').value,k=MP.distBin(d);$('#d6dv').textContent=d.toFixed(2)+' Å';
+  $('#d6l').textContent='거리 구간 '+MP.binLabel(k)+' → 라벨 '+(k+5)+' / 14';
+  [['#d6a',BINM[k]],['#d6b',EN.A(d)]].forEach(function(p){var C=setup($(p[0])),s=Math.min(38,(C.h-10)/4);heat(C.g,(C.w-4*s)/2,5,s,p[1]);});
+  var C=setup($('#d6c')),g=C.g,W=C.w,H=C.h;function X(x){return 40+(W-50)*(x-0.8)/7.2;}function Y(v){return 10+(H-34)*(1-v)/2;}
+  g.strokeStyle=css('--grid');g.fillStyle=css('--muted');g.font='11px system-ui,sans-serif';
+  [1,2,3,4,5,6,7,8].forEach(function(x){g.beginPath();g.moveTo(X(x),8);g.lineTo(X(x),H-24);g.stroke();g.fillText(x+'Å',X(x)-8,H-8);});
+  g.beginPath();g.moveTo(40,Y(0));g.lineTo(W-10,Y(0));g.stroke();
+  var cell=5;g.lineWidth=2;
+  g.strokeStyle=css('--s2');g.beginPath();for(var x=0.8;x<=8;x+=0.01){var y=BINM[MP.distBin(x)][cell];if(x===0.8)g.moveTo(X(x),Y(y));else g.lineTo(X(x),Y(y));}g.stroke();
+  g.strokeStyle=css('--s1');g.beginPath();for(x=0.8;x<=8;x+=0.02){y=EN.A(x)[cell];if(x===0.8)g.moveTo(X(x),Y(y));else g.lineTo(X(x),Y(y));}g.stroke();
+  g.strokeStyle=css('--text-primary');g.lineWidth=1;g.setLineDash([3,3]);g.beginPath();g.moveTo(X(d),8);g.lineTo(X(d),H-24);g.stroke();g.setLineDash([]);
+  g.fillStyle=css('--text-secondary');g.fillText('A의 (2, 2) 칸',44,20);
+}
+$('#d6d').addEventListener('input',onFrame(drawD6));
+
+/* ══════ 데모 7: 가상 엣지와 마스터 노드 ══════ */
+var D7={mol:'octanol',mode:'none'};
+chips($('#d7mol'),molItems(),D7.mol,function(k){D7.mol=k;drawD7();});
+chips($('#d7mode'),[{key:'none',label:'화학 그래프만'},{key:'virtual',label:'+ 가상 엣지'},{key:'master',label:'+ 마스터 노드'}],D7.mode,function(k){D7.mode=k;drawD7();});
+function drawD7(){
+  var m=MP.MOLS[D7.mol],n=m.atoms.length,T=+$('#d7t').value;$('#d7tv').textContent=T;
+  var adj=MP.adjacency(m),D=MP.graphDist(n,adj);
+  function dd(i,j){var x=D[i][j];if(D7.mode==='virtual')return i===j?0:1;if(D7.mode==='master')return Math.min(x,i===j?0:2);return x;}
+  var C=setup($('#d7g')),g=C.g,P=layout(m,C.w,C.h-(D7.mode==='master'?60:0),30),r=13;
+  var mp={x:C.w/2,y:C.h-24};
+  if(D7.mode==='virtual'){g.strokeStyle=css('--s4');g.globalAlpha=0.35;g.lineWidth=1;g.setLineDash([3,3]);
+    for(var i=0;i<n;i++)for(var j=i+1;j<n;j++)if(D[i][j]>1){g.beginPath();g.moveTo(P[i].x,P[i].y);g.lineTo(P[j].x,P[j].y);g.stroke();}
+    g.setLineDash([]);g.globalAlpha=1;}
+  if(D7.mode==='master'){g.strokeStyle=css('--el-M');g.globalAlpha=0.5;g.lineWidth=1.2;P.forEach(function(p){g.beginPath();g.moveTo(p.x,p.y);g.lineTo(mp.x,mp.y);g.stroke();});g.globalAlpha=1;}
+  m.b.forEach(function(e){drawBond(g,P[e[0]],P[e[1]],e[2],css('--axis'),2);});
+  m.atoms.forEach(function(a,i){drawAtom(g,P[i],a,r,{fill:true,text:String(i)});});
+  if(D7.mode==='master')drawAtom(g,mp,{el:'M'},r,{fill:true,text:'M'});
+  /* 도달 행렬 */
+  var C2=setup($('#d7m')),g2=C2.g,s=Math.min(22,(Math.min(C2.w,C2.h)-30)/n),x0=(C2.w-n*s)/2+8,y0=18,cov=0;
+  g2.fillStyle=css('--muted');g2.font='10.5px system-ui,sans-serif';g2.textAlign='center';
+  for(i=0;i<n;i++){g2.fillText(i,x0+i*s+s/2,y0-5);g2.fillText(i,x0-9,y0+i*s+s/2+4);
+    for(j=0;j<n;j++){var ok=dd(i,j)<=T;if(ok)cov++;g2.fillStyle=ok?css('--s1'):css('--grid');g2.globalAlpha=ok?0.85:1;g2.fillRect(x0+j*s,y0+i*s,s-2,s-2);g2.globalAlpha=1;g2.fillStyle=css('--muted');}}
+  g2.textAlign='left';
+  var E=m.b.length,msg=D7.mode==='virtual'?n*(n-1):D7.mode==='master'?2*E+2*n:2*E;
+  var need=0;for(i=0;i<n;i++)for(j=0;j<n;j++)need=Math.max(need,dd(i,j));
+  $('#d7out').innerHTML='<span>서로 닿은 쌍<b>'+Math.round(100*cov/(n*n))+'%</b></span><span>모두 닿는 데 필요한 T<b>'+need+'</b></span><span>한 단계의 메시지 수(방향 있음)<b>'+msg+'</b></span>';
+}
+$('#d7t').addEventListener('input',onFrame(drawD7));
+
+/* ══════ 데모 8: 합이 같은 집합 ══════ */
+var SETS=[{name:'집합 A',v:[0.5,0.5,0.5,0.5],c:'--s1'},{name:'집합 B',v:[2,0,0,0],c:'--s2'},{name:'집합 C',v:[1,1,0,0],c:'--s3'}];
+function drawD8(){
+  var q=+$('#d8q').value;$('#d8qv').textContent=q.toFixed(2);
+  var C=setup($('#d8c')),g=C.g,W=C.w,colW=(W-20)/3;
+  SETS.forEach(function(S,si){
+    var ex=S.v.map(function(x){return Math.exp(q*x);}),Z=ex.reduce(function(a,b){return a+b;}),a=ex.map(function(e){return e/Z;});
+    var rr=0;a.forEach(function(w,k){rr+=w*S.v[k];});var sum=S.v.reduce(function(x,y){return x+y;});
+    var x0=10+si*colW;g.fillStyle=css('--text-primary');g.font='650 13px system-ui,sans-serif';g.fillText(S.name+'  {'+S.v.join(', ')+'}',x0,18);
+    S.v.forEach(function(v,k){var bx=x0+k*(colW-20)/4,bw=(colW-20)/4-8;
+      g.fillStyle=css(S.c);g.globalAlpha=0.25;g.fillRect(bx,120-v*30,bw,v*30);g.globalAlpha=1;
+      g.fillStyle=css(S.c);g.fillRect(bx,120-v*30,bw,2);
+      g.fillStyle=css('--text-secondary');g.font='10.5px system-ui,sans-serif';g.fillText('a='+a[k].toFixed(2),bx,138);
+      g.fillStyle=css(S.c);g.fillRect(bx,144,bw*a[k],6);});
+    g.font='12.5px system-ui,sans-serif';g.fillStyle=css('--text-secondary');
+    g.fillText('합 판독 = '+sum.toFixed(2),x0,176);g.fillStyle=css('--text-primary');g.font='650 12.5px system-ui,sans-serif';g.fillText('어텐션 판독 r = '+rr.toFixed(3),x0,198);
+  });
+}
+$('#d8q').addEventListener('input',onFrame(drawD8));
+
+/* ══════ 데모 9: 타워 ══════ */
+function drawD9(){
+  var n=+$('#d9n').value,d=+$('#d9d').value,k=Math.pow(2,+$('#d9k').value);
+  $('#d9nv').textContent=n;$('#d9dv').textContent=d;$('#d9kv').textContent=k;
+  var base=n*n*d*d,tw=n*n*d*d/k,mix=k>1?n*d*d:0,tot=tw+mix;
+  var C=setup($('#d9c')),g=C.g,W=C.w-120;
+  [['k = 1',base,css('--s2'),20],['k = '+k,tw,css('--s1'),62]].forEach(function(b){
+    g.fillStyle=css('--text-primary');g.font='600 12.5px system-ui,sans-serif';g.fillText(b[0],8,b[3]+15);
+    g.fillStyle=b[2];g.fillRect(70,b[3],W*b[1]/base,22);});
+  if(mix){g.fillStyle=css('--s4');g.fillRect(70+W*tw/base,62,W*mix/base,22);}
+  g.fillStyle=css('--muted');g.font='11px system-ui,sans-serif';if(mix)g.fillText('보라: 섞기 g',70+W*tot/base+6,77);
+  $('#d9out').innerHTML='<span>k = 1 곱셈 수<b>'+(base/1e6).toFixed(2)+' M</b></span><span>타워 메시지 + 섞기<b>'+(tw/1e6).toFixed(2)+' + '+(mix/1e6).toFixed(2)+' M</b></span><span>이론 속도 향상<b>'+(base/tot).toFixed(1)+'×</b></span>';
+}
+['#d9n','#d9d','#d9k'].forEach(function(s){$(s).addEventListener('input',onFrame(drawD9));});
+
+/* ══════ 데모 10: QM9 결과 (표 2, 표 6) ══════ */
+var TGT=['μ','α','HOMO','LUMO','gap','R²','ZPVE','U₀','U','H','G','Cv','ω₁'];
+var T2={
+ BAML:[4.34,3.01,2.20,2.76,3.28,3.25,3.31,1.21,1.22,1.22,1.20,1.64,0.27],
+ BOB:[4.23,2.98,2.20,2.74,3.41,0.80,3.40,1.43,1.44,1.44,1.42,1.83,0.35],
+ CM:[4.49,4.33,3.09,4.26,5.32,2.83,4.80,2.98,2.99,2.99,2.97,2.36,1.32],
+ ECFP4:[4.82,34.54,2.89,3.10,3.86,90.68,241.58,85.01,85.59,86.21,78.36,30.29,1.47],
+ HDAD:[3.34,1.75,1.54,1.96,2.49,1.35,1.91,0.58,0.59,0.59,0.59,0.88,0.34],
+ GC:[0.70,2.27,1.18,1.10,1.78,4.73,9.75,3.02,3.16,3.19,2.95,1.45,0.32],
+ 'GG-NN':[1.22,1.55,1.17,1.08,1.70,3.99,2.52,0.83,0.86,0.81,0.78,1.19,0.53],
+ 'enn-s2s':[0.30,0.92,0.99,0.87,1.60,0.15,1.27,0.45,0.45,0.39,0.44,0.80,0.19],
+ 'enn-s2s-ens5':[0.20,0.68,0.74,0.65,1.23,0.11,1.10,0.33,0.34,0.30,0.34,0.62,0.15]};
+var T2AVG={BAML:2.17,BOB:2.08,CM:3.37,ECFP4:53.97,HDAD:1.35,GC:2.59,'GG-NN':1.36,'enn-s2s':0.68,'enn-s2s-ens5':0.52};
+var METH=[{key:'BAML',color:'--s7'},{key:'BOB',color:'--s6'},{key:'CM',color:'--muted'},{key:'ECFP4',color:'--axis'},{key:'HDAD',color:'--s4'},{key:'GC',color:'--s5'},{key:'GG-NN',color:'--s2'},{key:'enn-s2s',color:'--s1'},{key:'enn-s2s-ens5',color:'--s3'}];
+METH.forEach(function(m){m.label=m.key;m.on=['HDAD','GC','GG-NN','enn-s2s','enn-s2s-ens5'].indexOf(m.key)>=0;});
+METH.forEach(function(m){m.cvar=m.color;});
+function chipsD10(){chips($('#d10m'),METH.map(function(m){m.color=css(m.cvar);return m;}),null,function(){drawD10();},true);}
+function drawD10(){
+  var on=METH.filter(function(m){return m.on;}),mx=3;on.forEach(function(m){T2[m.key].forEach(function(v){mx=Math.max(mx,v);});});
+  var C=setup($('#d10c')),g=C.g,W=C.w,H=C.h,L=40,B=40,lo=Math.log10(0.1),hi=Math.log10(mx*1.3);
+  function Y(v){return 10+(H-B-10)*(1-(Math.log10(v)-lo)/(hi-lo));}
+  var cw=(W-L-10)/13;
+  g.strokeStyle=css('--grid');g.fillStyle=css('--muted');g.font='11px system-ui,sans-serif';
+  [0.1,0.3,1,3,10,30,100,300].filter(function(v){return v<=mx*1.3;}).forEach(function(v){g.beginPath();g.moveTo(L,Y(v));g.lineTo(W-10,Y(v));g.stroke();g.fillText(v,4,Y(v)+4);});
+  g.strokeStyle=css('--text-primary');g.setLineDash([5,4]);g.lineWidth=1.3;g.beginPath();g.moveTo(L,Y(1));g.lineTo(W-10,Y(1));g.stroke();g.setLineDash([]);
+  g.fillStyle=css('--text-secondary');g.textAlign='center';TGT.forEach(function(t,i){g.fillText(t,L+cw*(i+0.5),H-B+18);});
+  on.forEach(function(m,mi){var off=(mi-(on.length-1)/2)*Math.min(7,cw/(on.length+1));
+    T2[m.key].forEach(function(v,i){var x=L+cw*(i+0.5)+off;g.beginPath();g.arc(x,Y(v),m.key.indexOf('enn')===0?4.5:3.5,0,7);g.fillStyle=m.color;g.fill();});});
+  g.textAlign='left';g.fillStyle=css('--muted');g.fillText('↓ 낮을수록 좋음 · 점선 아래 = 화학적 정확도',L+4,H-6);
+  var acc=function(k){return T2[k].filter(function(v){return v<1;}).length;};
+  $('#d10out').innerHTML=on.map(function(m){return '<span>'+m.key+'<b>평균 '+T2AVG[m.key].toFixed(2)+' · '+acc(m.key)+'/13 도달</b></span>';}).join('');
+}
+(function(){var h='<tr><th>성질</th>'+METH.map(function(m){return '<th class="num">'+m.key+'</th>';}).join('')+'</tr>';
+  TGT.forEach(function(t,i){var best=Infinity;METH.forEach(function(m){if(m.key!=='enn-s2s-ens5')best=Math.min(best,T2[m.key][i]);});
+    h+='<tr><td>'+t+'</td>'+METH.map(function(m){var v=T2[m.key][i];return '<td class="num'+(v<1?' ok':'')+'">'+(v===best?'<strong>':'')+v.toFixed(2)+(v===best?'</strong>':'')+'</td>';}).join('')+'</tr>';});
+  h+='<tr><td><strong>평균</strong></td>'+METH.map(function(m){return '<td class="num"><strong>'+T2AVG[m.key].toFixed(2)+'</strong></td>';}).join('')+'</tr>';
+  $('#t2').innerHTML=h;$('#t2').classList.add('wide');})();
+var T6N=[11,35,58,82,110];
+var T6={'μ':[1.28,0.55,0.44,0.32,0.30],'α':[2.76,1.59,1.26,1.09,0.92],'HOMO':[2.33,1.50,1.34,1.19,0.99],'LUMO':[2.18,1.47,1.19,1.10,0.87],'gap':[3.53,2.34,2.07,1.84,1.60],
+ 'R²':[0.28,0.22,0.21,0.21,0.15],'ZPVE':[2.52,1.78,1.69,1.68,1.27],'U₀':[1.24,0.69,0.58,0.62,0.45],'U':[1.05,0.69,0.60,0.52,0.45],'H':[1.14,0.64,0.65,0.53,0.39],
+ 'G':[1.23,0.62,0.64,0.49,0.44],'Cv':[1.99,1.24,0.93,0.87,0.80],'ω₁':[0.28,0.25,0.24,0.15,0.19]};
+var D10S={t:'R²'};
+(function(){var s=$('#d10s');TGT.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;if(t===D10S.t)o.selected=true;s.appendChild(o);});
+  s.addEventListener('change',function(){D10S.t=s.value;drawD10b();});})();
+function drawD10b(){
+  var C=setup($('#d10b')),g=C.g,W=C.w,H=C.h,L=40,B=30,lo=Math.log10(0.1),hi=Math.log10(5);
+  function X(n){return L+(W-L-60)*(n-11)/99;}function Y(v){return 10+(H-B-10)*(1-(Math.log10(v)-lo)/(hi-lo));}
+  g.strokeStyle=css('--grid');g.fillStyle=css('--muted');g.font='11px system-ui,sans-serif';
+  [0.1,0.2,0.5,1,2,5].forEach(function(v){g.beginPath();g.moveTo(L,Y(v));g.lineTo(W-60,Y(v));g.stroke();g.fillText(v,6,Y(v)+4);});
+  T6N.forEach(function(n){g.fillText(n+'k',X(n)-8,H-10);});
+  g.strokeStyle=css('--text-primary');g.lineWidth=1;g.setLineDash([2,3]);g.beginPath();g.moveTo(L,Y(1));g.lineTo(W-60,Y(1));g.stroke();g.setLineDash([]);
+  var ti=TGT.indexOf(D10S.t);
+  TGT.forEach(function(t){var sel=t===D10S.t;g.strokeStyle=sel?css('--s1'):css('--axis');g.lineWidth=sel?2.6:1;g.globalAlpha=sel?1:0.6;
+    g.beginPath();T6[t].forEach(function(v,k){if(k)g.lineTo(X(T6N[k]),Y(v));else g.moveTo(X(T6N[k]),Y(v));});g.stroke();g.globalAlpha=1;
+    if(sel){T6[t].forEach(function(v,k){g.beginPath();g.arc(X(T6N[k]),Y(v),3.5,0,7);g.fillStyle=css('--s1');g.fill();g.fillStyle=css('--text-primary');g.fillText(v.toFixed(2),X(T6N[k])-10,Y(v)-8);});}});
+  var best=Infinity;['BAML','BOB','CM','ECFP4','HDAD','GC','GG-NN'].forEach(function(k){best=Math.min(best,T2[k][ti]);});
+  g.strokeStyle=css('--s2');g.lineWidth=1.6;g.setLineDash([6,4]);g.beginPath();g.moveTo(L,Y(best));g.lineTo(W-60,Y(best));g.stroke();g.setLineDash([]);
+  g.fillStyle=css('--s2');g.fillText('기존 최고 '+best.toFixed(2),W-58,Y(best)+4);
+}
+
+/* ══════ 데모 11: 브라우저 학습 ══════ */
+var D11={};
+function initD11(){
+  D11.tr=MP.makeData(1,2000,3);D11.te=MP.makeData(2,400,3);
+  var mean=D11.tr.reduce(function(s,g){return s+g.y;},0)/D11.tr.length;
+  D11.base=D11.te.reduce(function(s,g){return s+Math.abs(g.y-mean);},0)/D11.te.length;
+  D11.nets=[1,2,3].map(function(T){return new MP.Net(T,16,11);});
+  D11.r=MP.rng(3);D11.step=0;D11.hist=[[],[],[]];D11.run=false;D11.max=5000;
+  D11.nets.forEach(function(n,i){D11.hist[i].push([0,n.evalMAE(D11.te)]);});
+  D11.ex=D11.ex||0;$('#d11go').textContent='학습 시작';
+}
+function loopD11(){
+  if(!D11.run)return;var t0=performance.now();
+  while(performance.now()-t0<24&&D11.step<D11.max){
+    D11.step++;var lr=D11.step<3500?0.01:0.003;
+    D11.nets.forEach(function(n){n.trainBatch(D11.tr,D11.r,16,lr);});
+    if(D11.step%100===0)D11.nets.forEach(function(n,i){D11.hist[i].push([D11.step,n.evalMAE(D11.te)]);});
+  }
+  drawD11();
+  if(D11.step>=D11.max){D11.run=false;$('#d11go').textContent='학습 완료';return;}
+  requestAnimationFrame(loopD11);
+}
+var D11C=['--s2','--s3','--s1'];
+function drawD11(){
+  var C=setup($('#d11c')),g=C.g,W=C.w,H=C.h,L=44,B=26,ymax=Math.max(1,D11.base*1.25);
+  function X(s){return L+(W-L-10)*s/D11.max;}function Y(v){return 8+(H-B-8)*(1-Math.min(v,ymax)/ymax);}
+  g.strokeStyle=css('--grid');g.fillStyle=css('--muted');g.font='11px system-ui,sans-serif';
+  for(var v=0;v<=ymax+1e-9;v+=0.2){g.beginPath();g.moveTo(L,Y(v));g.lineTo(W-10,Y(v));g.stroke();g.fillText(v.toFixed(1),8,Y(v)+4);}
+  [0,1000,2000,3000,4000,5000].forEach(function(s){g.fillText(s,X(s)-10,H-8);});
+  g.strokeStyle=css('--axis');g.setLineDash([5,4]);g.beginPath();g.moveTo(L,Y(D11.base));g.lineTo(W-10,Y(D11.base));g.stroke();g.setLineDash([]);
+  D11.hist.forEach(function(hs,i){g.strokeStyle=css(D11C[i]);g.lineWidth=2;g.beginPath();hs.forEach(function(p,k){if(k)g.lineTo(X(p[0]),Y(p[1]));else g.moveTo(X(p[0]),Y(p[1]));});g.stroke();});
+  var last=D11.hist.map(function(h){return h[h.length-1][1];});
+  /* 예시 분자 */
+  var ex=D11.te[D11.ex%D11.te.length],C2=setup($('#d11g')),g2=C2.g;
+  var pos=treeLayout(ex,C2.w,C2.h),adjE=ex.adj.map(function(l){return l.map(function(w){return {w:w};});}),Dm=MP.graphDist(ex.n,adjE);
+  g2.strokeStyle=css('--s8');g2.lineWidth=1.6;g2.setLineDash([4,3]);
+  for(var i=0;i<ex.n;i++)for(var j=i+1;j<ex.n;j++)if(ex.types[i]&&ex.types[j]&&Dm[i][j]===3){g2.beginPath();g2.moveTo(pos[i].x,pos[i].y);
+    g2.quadraticCurveTo((pos[i].x+pos[j].x)/2,(pos[i].y+pos[j].y)/2-40,pos[j].x,pos[j].y);g2.stroke();}
+  g2.setLineDash([]);
+  ex.edges.forEach(function(e){drawBond(g2,pos[e[0]],pos[e[1]],1,css('--axis'),2);});
+  ex.types.forEach(function(t,i){drawAtom(g2,pos[i],{el:['C','N','O'][t]},13,{fill:true});});
+  var preds=D11.nets.map(function(n){return n.forward(ex).y;});
+  $('#d11out').innerHTML='<span>스텝<b>'+D11.step+' / '+D11.max+'</b></span>'+
+    [0,1,2].map(function(i){return '<span style="color:'+css(D11C[i])+'">T = '+(i+1)+' 시험 MAE<b>'+last[i].toFixed(3)+'</b></span>';}).join('')+
+    '<span>예시 분자 정답 / 예측<b>'+ex.y+' / '+preds.map(function(p){return p.toFixed(1);}).join(' · ')+'</b></span>';
+}
+function treeLayout(t,W,H){/* 루트 0에서 BFS 층을 가로로, 층 안에서는 세로로 */
+  var depth=new Array(t.n).fill(-1),order=[0],lv={};depth[0]=0;
+  for(var k=0;k<order.length;k++){var u=order[k];t.adj[u].forEach(function(w){if(depth[w]<0){depth[w]=depth[u]+1;order.push(w);}});}
+  order.forEach(function(u){(lv[depth[u]]=lv[depth[u]]||[]).push(u);});
+  var maxD=Math.max.apply(null,depth),pos=[];
+  Object.keys(lv).forEach(function(d){var row=lv[d];row.forEach(function(u,i){pos[u]={x:40+(W-80)*(maxD?d/maxD:0.5),y:30+(H-60)*((i+1)/(row.length+1))};});});
+  return pos;
+}
+$('#d11go').addEventListener('click',function(){if(D11.step>=D11.max)return;D11.run=!D11.run;this.textContent=D11.run?'일시정지':'계속';if(D11.run)loopD11();});
+$('#d11reset').addEventListener('click',function(){D11.run=false;initD11();drawD11();});
+$('#d11next').addEventListener('click',function(){D11.ex++;drawD11();});
+
+/* ══════ 퀴즈 ══════ */
+var QZ=[
+ {q:'식 (1)에서 이웃 메시지를 합하는 것이 주는 성질은?',o:['원자 수가 늘어도 계산량이 일정하다','이웃의 순서(번호)가 결과에 영향을 주지 않는다','먼 원자의 정보가 한 단계에 들어온다'],a:1,
+  e:'합은 항의 순서와 무관합니다. 판독 R까지 순열 불변이면 MPNN 전체가 원자 번호 매기기와 무관해집니다(4절).'},
+ {q:'T = 3번 메시지를 주고받은 뒤 원자 v의 상태 h_v³에 정보가 들어 있는 원자는? (화학 그래프만 쓸 때)',o:['바로 옆 원자만','그래프 거리 3 이내의 원자','분자 안의 모든 원자'],a:1,
+  e:'한 단계에 한 칸씩 퍼집니다. 모든 원자를 보려면 가상 엣지나 마스터 노드, 혹은 모든 쌍에 거리 엣지를 두는 표현이 필요합니다(7절).'},
+ {q:'논문의 최고 모델 enn-s2s가 GG-NN에서 바꾼 두 가지는?',o:['갱신 함수를 LSTM으로, 판독을 평균으로','메시지 행렬을 엣지 벡터로부터 신경망이 만들게 하고, 판독을 set2set으로','층마다 다른 가중치를 쓰고, 마스터 노드를 추가'],a:1,
+  e:'엣지 네트워크 A(e_vw)는 실수 거리 같은 연속 엣지 특징을 받을 수 있고, set2set은 합 판독보다 표현력이 큽니다. 갱신은 그대로 GRU입니다.'},
+ {q:'오차 비율이 0.45라는 것은?',o:['MAE가 화학적 정확도 목표의 45%로, 목표 안에 들어왔다','정답률이 45%다','DFT보다 45% 빠르다'],a:0,
+  e:'오차 비율 = MAE ÷ 화학적 정확도. 1 미만이면 그 성질에서 화학적 정확도에 도달한 것입니다(10절).'},
+ {q:'타워(k = 8)에 대해 맞는 설명은?',o:['원자를 8개 무리로 나눠 따로 계산한다','상태 벡터를 8조각으로 나눠 조각마다 메시지 전달을 하고 신경망으로 섞는다 — 계산량이 약 1/k이 되고 앙상블처럼 성능도 올랐다','T를 8로 고정한다'],a:1,
+  e:'메시지 비용이 n²d²에서 n²d²/k로 줄고, 실측으로는 n = 9, d = 200에서 추론이 약 2배 빨라졌습니다. 13개 중 12개 성질에서 오차도 줄었습니다(9절).'},
+ {q:'데모 11에서 거리 3인 쌍을 세는데 T = 2로도 충분했던 이유는?',o:['tanh가 거리를 늘려 주기 때문','쌍 양 끝을 모두 2칸 안에 두는 가운데 원자가 있고, 합 판독이 그 원자들의 출력을 모으기 때문','학습 데이터가 충분해서'],a:1,
+  e:'경로 a–b–c–d에서 b는 2단계면 a와 d를 모두 봅니다. 판독이 모든 원자를 모으므로 거리 K인 관계에는 약 ⌈K/2⌉ 단계면 됩니다.'}
+];
+(function(){
+  var box=$('#quiz'),score=0,done=0;
+  QZ.forEach(function(it,qi){
+    var d=document.createElement('div');d.className='q';
+    d.innerHTML='<h4>Q'+(qi+1)+'. '+it.q+'</h4>'+it.o.map(function(o,j){return '<label class="opt"><input type="radio" name="q'+qi+'" value="'+j+'">'+o+'</label>';}).join('')+'<div class="expl"></div>';
+    box.appendChild(d);
+    d.querySelectorAll('input').forEach(function(inp){inp.addEventListener('change',function(){
+      if(d.dataset.done)return;d.dataset.done=1;done++;
+      var j=+inp.value,ok=j===it.a;if(ok)score++;
+      d.querySelectorAll('.opt').forEach(function(l,x){if(x===it.a)l.classList.add('correct');else if(x===j)l.classList.add('wrong');});
+      var ex=d.querySelector('.expl');ex.textContent=(ok?'정답! ':'오답. ')+it.e;ex.classList.add('show');if(!ok)ex.classList.add('bad');
+      $('#quizScore').textContent=done+'문제 중 '+score+'개 정답'+(done===QZ.length?' — 끝!':'');
+    });});
+  });
+})();
+
+/* ══════ 테마·초기화 ══════ */
+function drawAll(){drawD1();drawD2();drawD3();drawD4();drawD5();drawD6();drawD7();drawD8();drawD9();chipsD10();drawD10();drawD10b();drawD11();}
+var tbtn=$('#themeBtn');
+if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');
+function syncBtn(){tbtn.textContent=document.documentElement.getAttribute('data-theme')==='dark'?'◑ 라이트':'◐ 다크';}
+tbtn.addEventListener('click',function(){var d=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',d?'light':'dark');cssCache={};syncBtn();drawAll();});
+initD11();syncBtn();drawAll();
+var rz,lastW=document.documentElement.clientWidth;
+window.addEventListener('resize',function(){clearTimeout(rz);rz=setTimeout(function(){
+  var w=document.documentElement.clientWidth;if(w===lastW)return;lastW=w;drawAll();},120);});
+function renderMath(){if(!window.renderMathInElement)return;drawD5();if(!document.querySelector('.eq .katex'))renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}]});}
+document.addEventListener('DOMContentLoaded',renderMath);
+window.addEventListener('load',renderMath);
+</script>
+</body>
+</html>
