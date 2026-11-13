@@ -4,6 +4,8 @@
 
 🔗 **[데모 바로가기](https://dev-jonghoonpark.github.io/how-mpnn-works/)**
 
+📘 **[보충: DFT가 뭔가요?](https://dev-jonghoonpark.github.io/how-mpnn-works/dft.html)** — MPNN이 흉내 내는 계산인 밀도범함수이론(Density Functional Theory). 파동함수 대신 전자 밀도로 푸는 발상(호엔베르크–콘), 콘–샴 방정식, **브라우저에서 도는 1차원 자기일관(SCF) 계산기**(전하 출렁임과 섞기 비율), 교환-상관 범함수의 사다리, O(N³) 비용, DFT 자체의 오차와 MPNN의 관계
+
 ## 다루는 내용
 
 1. **병목은 정확도가 아니라 비용** · DFT는 QM9 분자 하나에 코어 1시간, 신경망 추론은 30만 배 빠르다 — 후보 분자 수·코어 수로 보는 스크리닝 시간 계산기
