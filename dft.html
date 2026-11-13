@@ -187,7 +187,7 @@ td.ok{color:var(--good);font-weight:650}
 <!-- ───────── 1 ───────── -->
 <h2 id="s1">1. 문제: 파동함수는 너무 크다</h2>
 <p>원자핵은 전자보다 수천 배 무거워서 거의 멈춰 있다고 놓을 수 있습니다(보른–오펜하이머 근사). 그러면 분자의 문제는 고정된 핵들이 만드는 퍼텐셜 \(v_{\text{ext}}\) 속에서 전자 N개가 따르는 슈뢰딩거 방정식이 됩니다.</p>
-<div class="eq">\[ \Big[ -\tfrac12 \sum_{i=1}^{N} \nabla_i^2 + \sum_{i} v_{\text{ext}}(\mathbf r_i) + \sum_{i<j} \frac{1}{|\mathbf r_i - \mathbf r_j|} \Big]\, \Psi(\mathbf r_1, \dots, \mathbf r_N) = E\, \Psi \]
+<div class="eq">\[ \Big[ -\tfrac12 \sum_{i=1}^{N} \nabla_i^2 + \sum_{i} v_{\text{ext}}(\mathbf r_i) + \sum_{i \lt j} \frac{1}{|\mathbf r_i - \mathbf r_j|} \Big]\, \Psi(\mathbf r_1, \dots, \mathbf r_N) = E\, \Psi \]
 <span class="note">원자 단위(ħ = mₑ = e = 1). 마지막 항이 전자끼리의 반발입니다. 이 항 때문에 전자들을 따로따로 풀 수 없습니다.</span></div>
 <p>답 \(\Psi\)는 <strong>전자 N개의 좌표 3N개를 받는 함수</strong>입니다. 컴퓨터에 담으려면 축마다 격자점 g개를 찍어 \(g^{3N}\)개 숫자를 저장해야 합니다.</p>
 
@@ -214,19 +214,19 @@ td.ok{color:var(--good);font-weight:650}
 <p>1965년 콘(Kohn)과 샴(Sham)은 우회로를 냈습니다. 실제 전자들은 서로 밀어내지만, <strong>서로 상호작용하지 않으면서 실제와 똑같은 밀도를 갖는 가상의 전자들</strong>을 생각합니다. 상호작용이 없으면 전자 하나짜리 방정식 N개로 쪼개지고, 운동에너지 \(T_s\)는 오비탈로 정확히 계산할 수 있습니다. 대신 상호작용의 효과를 모두 유효 퍼텐셜 \(v_{\text{eff}}\) 하나에 몰아넣습니다.</p>
 <div class="eq">\[ E[n] = T_s[n] + \int v_{\text{ext}}\, n \, d\mathbf r + E_H[n] + E_{xc}[n] \]
 <span class="note">\(T_s\): 가상 전자들의 운동에너지(오비탈로 정확히 계산). \(E_H = \tfrac12 \iint \frac{n(\mathbf r) n(\mathbf r')}{|\mathbf r-\mathbf r'|}\): 밀도 구름끼리의 고전적 정전기 반발(하트리 에너지). \(E_{xc}\): <strong>나머지 전부</strong> — 양자역학적 교환·상관 효과와 운동에너지 보정. 모르는 것은 이 항 하나뿐입니다.</span></div>
-<div class="eq">\[ \Big[ -\tfrac12 \nabla^2 + v_{\text{eff}}(\mathbf r) \Big] \varphi_i = \varepsilon_i\, \varphi_i, \qquad n(\mathbf r) = \sum_{i}^{\text{점유}} |\varphi_i(\mathbf r)|^2 \]
+<div class="eq">\[ \Big[ -\tfrac12 \nabla^2 + v_{\text{eff}}(\mathbf r) \Big] \varphi_i = \varepsilon_i\, \varphi_i, \qquad n(\mathbf r) = \sum_{i \in \text{occ}} |\varphi_i(\mathbf r)|^2 \]
 \[ v_{\text{eff}} = v_{\text{ext}} + \underbrace{\int \frac{n(\mathbf r')}{|\mathbf r - \mathbf r'|} d\mathbf r'}_{v_H} + \underbrace{\frac{\delta E_{xc}}{\delta n}}_{v_{xc}} \]
-<span class="note">여기에 순환이 있습니다. 오비탈 \(\varphi_i\)를 구하려면 \(v_{\text{eff}}\)가 필요한데, \(v_{\text{eff}}\)는 밀도 \(n\)으로 만들고, \(n\)은 다시 오비탈로 만듭니다. 그래서 반복해서 풉니다.</span></div>
+<span class="note">occ는 전자가 찬(occupied) 오비탈만 더한다는 뜻입니다. 여기에 순환이 있습니다. 오비탈 \(\varphi_i\)를 구하려면 \(v_{\text{eff}}\)가 필요한데, \(v_{\text{eff}}\)는 밀도 \(n\)으로 만들고, \(n\)은 다시 오비탈로 만듭니다. 그래서 반복해서 풉니다.</span></div>
 
 <!-- ───────── 4 ───────── -->
 <h2 id="s4">4. 자기일관 반복을 직접 돌려 보기</h2>
 <p>콘–샴 방정식은 <strong>자기일관장(self-consistent field, SCF) 반복</strong>으로 풉니다. 밀도를 추측하고, 그 밀도로 유효 퍼텐셜을 만들고, 오비탈을 풀어 새 밀도를 얻고, 들어간 밀도와 나온 밀도가 같아질 때까지 반복합니다.</p>
-<div class="flow"><span>밀도 n 추측</span><em>→</em><span>v_eff = v_ext + v_H[n] + v_xc[n]</span><em>→</em><span>φᵢ, εᵢ 풀기</span><em>→</em><span>n′ = Σ|φᵢ|²</span><em>→</em><span>n ← (1−α)n + αn′</span><em>↺</em></div>
+<div class="flow"><span>밀도 n 추측</span><em>→</em><span>v<sub>eff</sub> = v<sub>ext</sub> + v<sub>H</sub>[n] + v<sub>xc</sub>[n]</span><em>→</em><span>φ<sub>i</sub>, ε<sub>i</sub> 풀기</span><em>→</em><span>n′ = Σ|φ<sub>i</sub>|²</span><em>→</em><span>n ← (1−α)n + αn′</span><em>↺</em></div>
 <p>아래 계산기는 이 과정을 1차원 격자(점 161개)에서 실제로 돌립니다. 전자 반발은 1차원에서 쓰는 연화 쿨롱 \(1/\sqrt{(x-x')^2+1}\), 교환-상관은 3차원 LDA 교환식 \(v_x = -(3n/\pi)^{1/3}\)을 그대로 빌려 쓴 장난감 근사입니다. 첫 추측은 밀도 0이라 첫 단계는 전자 반발이 없는 문제를 풉니다.</p>
 
 <div class="demo">
   <h4>데모 2 · 1차원 콘–샴 계산기</h4>
-  <p class="cap">위: 외부 퍼텐셜(회색), 유효 퍼텐셜(주황), 그리고 각 오비탈을 그 에너지 높이에 그렸습니다(파랑은 전자가 찬 오비탈, 회색 점선은 빈 오비탈. 높이는 오비탈 에너지 εᵢ). 가운데: 들어간 밀도(점선)와 나온 밀도(실선). 아래: 반복마다 |n′ − n|의 적분(로그 눈금).</p>
+  <p class="cap">위: 외부 퍼텐셜(회색), 유효 퍼텐셜(주황), 그리고 각 오비탈을 그 에너지 높이에 그렸습니다(파랑은 전자가 찬 오비탈, 회색 점선은 빈 오비탈. 높이는 오비탈 에너지 ε<sub>i</sub>). 가운데: 들어간 밀도(점선)와 나온 밀도(실선). 아래: 반복마다 |n′ − n|의 적분(로그 눈금).</p>
   <div class="chips" id="d2sys"></div>
   <div class="ctrls">
     <div class="ctrl"><label>전자 수 <b id="d2nev"></b></label><input type="range" id="d2ne" min="2" max="8" step="2" value="4"></div>
@@ -260,7 +260,7 @@ td.ok{color:var(--good);font-weight:650}
 <p>SCF 한 바퀴의 핵심 비용은 해밀토니안 행렬을 대각화해 오비탈을 구하는 일인데, 행렬 크기가 계 크기에 비례하므로 <strong>\(O(N^3)\)</strong>입니다. 파동함수를 직접 다루는 정밀한 방법들과 비교하면 매우 싼 편입니다. 화학의 “기준 정답”으로 불리는 CCSD(T)는 \(O(N^7)\), 완전 배치 상호작용(full CI)은 지수적으로 늘어납니다.</p>
 <div class="demo">
   <h4>데모 3 · 분자가 커지면 계산 시간은</h4>
-  <p class="cap">무거운 원자 9개짜리 분자의 DFT를 1시간으로 놓고(MPNN 논문의 QM9 기준), 원자 수에 따라 비용이 Nᵖ로 늘어난다고 계산했습니다. CCSD(T)는 9개일 때도 DFT보다 훨씬 비싸지만, 여기서는 늘어나는 <strong>비율</strong>만 비교하려고 같은 1시간에서 출발시켰습니다.</p>
+  <p class="cap">무거운 원자 9개짜리 분자의 DFT를 1시간으로 놓고(MPNN 논문의 QM9 기준), 원자 수에 따라 비용이 N<sup>p</sup>로 늘어난다고 계산했습니다. CCSD(T)는 9개일 때도 DFT보다 훨씬 비싸지만, 여기서는 늘어나는 <strong>비율</strong>만 비교하려고 같은 1시간에서 출발시켰습니다.</p>
   <div class="ctrls"><div class="ctrl"><label>무거운 원자 수 <b id="d3nv"></b></label><input type="range" id="d3n" min="9" max="100" step="1" value="17"></div></div>
   <div class="readout" id="d3out"></div>
 </div>
@@ -397,7 +397,7 @@ function drawD2(){
   hs.forEach(function(h,k){g3.beginPath();g3.arc(X3(k),Y3(h.diff),2.5,0,7);g3.fillStyle=css('--s1');g3.fill();});
   var conv=L.diff<1e-6;
   $('#d2out').innerHTML='<span>반복<b>'+S.iter+'</b></span><span>|n′ − n|<b>'+L.diff.toExponential(2)+'</b></span><span>총 에너지 E<b>'+L.E.toFixed(5)+' Ha</b></span>'+
-    '<span>오비탈 에너지 εᵢ<b class="mono" style="font-size:13px">'+L.orbs.map(function(o,k){return (k<L.nOcc?'●':'○')+o.eps.toFixed(3);}).join(' ')+'</b></span>'+'<span>상태<b style="color:'+(conv?css('--good'):css('--text-primary'))+'">'+(conv?'수렴':(S.iter>=150?'150번 안에 수렴 안 함':'진행 중'))+'</b></span>';
+    '<span>오비탈 에너지 ε<sub>i</sub><b class="mono" style="font-size:13px">'+L.orbs.map(function(o,k){return (k<L.nOcc?'●':'○')+o.eps.toFixed(3);}).join(' ')+'</b></span>'+'<span>상태<b style="color:'+(conv?css('--good'):css('--text-primary'))+'">'+(conv?'수렴':(S.iter>=150?'150번 안에 수렴 안 함':'진행 중'))+'</b></span>';
 }
 
 /* ══════ 데모 3: 비용 ══════ */

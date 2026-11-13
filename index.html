@@ -429,8 +429,8 @@ td.bad{color:var(--s8)}
 <!-- ───────── 11 ───────── -->
 <h2 id="s11">11. 브라우저에서 학습하는 MPNN: T는 몇이면 되나</h2>
 <p>이제 MPNN을 직접 학습시켜 봅니다. QM9를 브라우저에서 돌릴 수는 없으니, 장거리 정보가 필요한 장난감 과제를 만들었습니다. 무거운 원자 6~9개짜리 나무 모양 분자(C 60%, N 20%, O 20%)에서 <strong>그래프 거리가 정확히 3인 헤테로원자(N·O) 쌍의 수</strong>를 맞히는 과제입니다. 원자 셋을 사이에 둔 짝을 세야 하므로, 메시지를 몇 번 주고받아야 하는지가 그대로 드러납니다.</p>
-<div class="eq">\[ h_v^0 = E_{\text{종류}(v)},\quad h_v^{t+1} = \tanh\!\Big(U h_v^t + A \sum_{w \in N(v)} h_w^t + b\Big),\quad \hat{y} = \sum_v w^\top \tanh(R\, h_v^T + c) + b_0 \]
-<span class="note">\(d = 16\), 가중치는 \(t\)에 공유(논문과 같음), 손실은 MSE, Adam. 학습 그래프 2,000개, 시험 그래프 400개. T = 1, 2, 3인 모델 셋을 같은 데이터로 동시에 학습합니다.</span></div>
+<div class="eq">\[ h_v^0 = E_{z_v},\quad h_v^{t+1} = \tanh\!\Big(U h_v^t + A \sum_{w \in N(v)} h_w^t + b\Big),\quad \hat{y} = \sum_v w^\top \tanh(R\, h_v^T + c) + b_0 \]
+<span class="note">\(z_v\)는 원자 \(v\)의 종류(C·N·O), \(d = 16\), 가중치는 \(t\)에 공유(논문과 같음), 손실은 MSE, Adam. 학습 그래프 2,000개, 시험 그래프 400개. T = 1, 2, 3인 모델 셋을 같은 데이터로 동시에 학습합니다.</span></div>
 
 <div class="demo">
   <h4>데모 11 · T = 1, 2, 3 동시 학습</h4>
